@@ -1,0 +1,87 @@
+{% extends 'base.html' %}
+{% block title %}Plans - Spending Tracker{% endblock %}
+{% block content %}
+    <h1>Spending Plan</h1>
+    <p>Manage your budgets and track your financial goals.</p>
+
+    <div class="action-buttons">
+        <button onclick="openPlanForm()" class="add-transaction-btn">Add Plan</button>
+    </div>
+
+    <table id="planTable">
+        <thead>
+            <tr>
+                <th>Plan</th>
+                <th>Description</th>
+                <th>Category</th>
+                <th>From Date</th>
+                <th>To Date</th>
+                <th>Left Money</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for plan in plans %}
+            <tr>
+                <td>{{ plan.type|title }}</td>
+                <td>{{ plan.description }}</td>
+                <td>{{ plan.categories.all|join:", " }}</td>
+                <td>{{ plan.from_date|date:"Y-m-d" }}</td>
+                <td>{{ plan.to_date|date:"Y-m-d" }}</td>
+                <td>{{ plan.left_money }} {{ request.GET.display_currency|default:'QAR' }}</td>
+                <td>{{ plan.status }}</td>
+                <td>
+                    <button onclick="editPlan({{ plan.id }})" style="background-color: #ff4444;">Edit</button>
+                    <button onclick="deletePlan({{ plan.id }})" style="background-color: #ff4444;">Delete</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="modal" id="planModal">
+        <h3>Add Plan</h3>
+        <form id="planForm">
+            <label for="planType">Plan Type:</label>
+            <select id="planType" required>
+                <option value="monthly">Monthly</option>
+                <option value="custom">Custom Date Range</option>
+            </select>
+            <label for="planAmount">Budget Amount:</label>
+            <input type="number" id="planAmount" required min="0" step="0.01">
+            <label for="planDescription">Description:</label>
+            <textarea id="planDescription" required></textarea>
+            <label for="planCategories">Categories (comma-separated):</label>
+            <input type="text" id="planCategories" required placeholder="e.g., Food, Transport">
+            <label for="planFromDate">From Date:</label>
+            <input type="date" id="planFromDate" required>
+            <label for="planToDate">To Date:</label>
+            <input type="date" id="planToDate" required>
+            <button type="button" onclick="addPlan()" style="background-color: #00ff99;">Add</button>
+            <button type="button" onclick="closePlanForm()" style="background-color: #7f8c8d;">Cancel</button>
+        </form>
+    </div>
+
+    <div class="modal" id="editPlanModal">
+        <h3>Edit Plan</h3>
+        <form id="editPlanForm">
+            <label for="editPlanAmount">Budget Amount:</label>
+            <input type="number" id="editPlanAmount" required min="0" step="0.01">
+            <label for="editPlanDescription">Description:</label>
+            <textarea id="editPlanDescription" required></textarea>
+            <label for="editPlanCategories">Categories (comma-separated):</label>
+            <input type="text" id="editPlanCategories" required>
+            <label for="editPlanFromDate">From Date:</label>
+            <input type="date" id="editPlanFromDate" required>
+            <label for="editPlanToDate">To Date:</label>
+            <input type="date" id="editPlanToDate" required>
+            <button type="button" onclick="updatePlan()" style="background-color: #00ff99;">Save</button>
+            <button type="button" onclick="closeEditPlanForm()" style="background-color: #7f8c8d;">Cancel</button>
+        </form>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <script src="{% static 'js/script.js' %}"></script>
+{% endblock %}

@@ -1,0 +1,147 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Spending Tracker{% endblock %}</title>
+    {% load static %}
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+    <header>
+        <div class="logo">💰 SpendingTracker</div>
+        <nav>
+            <ul>
+                <li><a href="{% url 'spending_tracker_app:index' %}">Home</a></li>
+                <li><a href="{% url 'spending_tracker_app:charts' %}">Charts</a></li>
+                <li><a href="{% url 'spending_tracker_app:plans' %}">Plan</a></li>
+                <li><a href="{% url 'spending_tracker_app:profile' %}">Profile</a></li>
+                <li>
+                    {% if user.is_authenticated %}
+                        <a href="#" onclick="openLogoutModal()">Logout</a>
+                    {% else %}
+                        <a href="{% url 'login' %}">Login</a>
+                    {% endif %}
+                </li>
+                <li>
+                    {% if not user.is_authenticated %}
+                        <a href="{% url 'spending_tracker_app:signup' %}">Sign Up</a>
+                    {% endif %}
+                </li>
+            </ul>
+        </nav>
+    </header>
+
+    <main>
+        {% if messages %}
+            {% for message in messages %}
+                <div class="message">{{ message }}</div>
+            {% endfor %}
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Logout Modal -->
+    <div class="modal" id="logoutModal">
+        <h3>Confirm Logout</h3>
+        <p>Are you sure you want to logout?</p>
+        <form id="logoutForm" method="post" action="{% url 'spending_tracker_app:logout' %}">
+            {% csrf_token %}
+            <button type="submit">Yes</button>
+            <button type="button" onclick="closeLogoutModal()">No</button>
+        </form>
+    </div>
+
+    <!-- Login Modal (Optional, can be removed if using page-based login) -->
+    <div class="modal" id="loginModal">
+        <h3>Login</h3>
+        <form id="loginForm" method="post" action="{% url 'login' %}">
+            {% csrf_token %}
+            <label for="id_username">Username:</label>
+            <input type="text" name="username" id="id_username" required>
+            <label for="id_password">Password:</label>
+            <input type="password" name="password" id="id_password" required>
+            <button type="submit">Login</button>
+            <button type="button" onclick="closeLoginModal()">Cancel</button>
+        </form>
+    </div>
+
+    <!-- Signup Modal (Optional, can be removed if using page-based signup) -->
+    <div class="modal" id="signupModal">
+        <h3>Sign Up</h3>
+        <form id="signupForm" method="post" action="{% url 'spending_tracker_app:signup' %}">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Sign Up</button>
+            <button type="button" onclick="closeSignupModal()">Cancel</button>
+        </form>
+    </div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+        const csrftoken = getCookie('csrftoken');
+    </script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
+    <script src="{% static 'js/script.js' %}"></script>
+    <script>
+        function openLogoutModal() {
+            document.getElementById("logoutModal").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+        }
+
+        function closeLogoutModal() {
+            document.getElementById("logoutModal").style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+        }
+
+        function openLoginModal() {
+            document.getElementById("loginModal").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+        }
+
+        function closeLoginModal() {
+            document.getElementById("loginModal").style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+        }
+
+        function openSignupModal() {
+            document.getElementById("signupModal").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+        }
+
+        function closeSignupModal() {
+            document.getElementById("signupModal").style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+        }
+
+        function openReportModal() {
+            document.getElementById("reportModal").style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+            document.getElementById("reportFilename").value = "report";
+        }
+
+        function closeReportModal() {
+            document.getElementById("reportModal").style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+        }
+    </script>
+</body>
+</html>

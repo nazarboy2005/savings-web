@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Settings{% endblock %}
+{% block content %}
+    <h2>Settings</h2>
+    <form method="post">
+        {% csrf_token %}
+        <label for="default_currency">Default Currency:</label>
+        <select name="default_currency" id="default_currency">
+            <option value="QAR" {% if profile.default_currency == 'QAR' %}selected{% endif %}>QAR</option>
+            <option value="USD" {% if profile.default_currency == 'USD' %}selected{% endif %}>USD</option>
+            <option value="EUR" {% if profile.default_currency == 'EUR' %}selected{% endif %}>EUR</option>
+        </select>
+        <button type="submit">Save</button>
+    </form>
+    {% if error %}
+        <p class="error">{{ error }}</p>
+    {% endif %}
+    <a href="{% url 'spending_tracker_app:index' %}">Back to Home</a>
+{% endblock %}

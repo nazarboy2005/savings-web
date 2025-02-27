@@ -1,0 +1,91 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Charts - Spending Tracker{% endblock %}
+{% block content %}
+    <h1>Spending Visualizations</h1>
+    <p>Visualize your spending patterns over time.</p>
+
+    <div class="filters">
+        <form id="filterForm" method="get" action="{% url 'spending_tracker_app:charts' %}">
+            <label for="filterStatus">Filter:</label>
+            <select name="status" id="filterStatus">
+                <option value="all" {% if not request.GET.status or request.GET.status == 'all' %}selected{% endif %}>All</option>
+                <option value="spent" {% if request.GET.status == 'spent' %}selected{% endif %}>Only Spent</option>
+                <option value="earned" {% if request.GET.status == 'earned' %}selected{% endif %}>Only Earned</option>
+            </select>
+            <label for="filterCategory">Category:</label>
+            <select name="category" id="filterCategory">
+                <option value="" {% if not request.GET.category %}selected{% endif %}>All Categories</option>
+                {% for cat in categories %}
+                    <option value="{{ cat.name }}" {% if request.GET.category == cat.name %}selected{% endif %}>{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+            <label for="startDate">From:</label>
+            <input type="date" name="start_date" id="startDate" value="{{ request.GET.start_date|default:'' }}">
+            <label for="endDate">To:</label>
+            <input type="date" name="end_date" id="endDate" value="{{ request.GET.end_date|default:'' }}">
+            <label for="displayCurrency">Display Currency:</label>
+            <select name="display_currency" id="displayCurrency">
+                <option value="QAR" {% if request.GET.display_currency == 'QAR' %}selected{% endif %}>QAR</option>
+                <option value="USD" {% if request.GET.display_currency == 'USD' %}selected{% endif %}>USD</option>
+                <option value="EUR" {% if request.GET.display_currency == 'EUR' %}selected{% endif %}>EUR</option>
+            </select>
+            <button type="submit">Apply Filters</button>
+        </form>
+    </div>
+
+    <div class="visualization">
+        <h2>Visualize Your Spending</h2>
+        <div class="chart-placeholder" id="pieChart">Pie Chart (Spending by Category)</div>
+        <div class="chart-placeholder" id="barChart">Bar Chart (Spending by Category)</div>
+        <div class="chart-placeholder" id="lineChart">Line Chart (Spending Trends)</div>
+    </div>
+
+    <script src="{% static 'js/script.js' %}"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", () => {
+            applyFiltersCharts();
+            updateVisualizationsCharts();
+        });
+
+        function applyFiltersCharts() {
+            const filterStatus = document.getElementById("filterStatus").value;
+            const filterCategory = document.getElementById("filterCategory").value;
+            const startDate = document.getElementById("startDate").value;
+            const endDate = document.getElementById("endDate").value;
+
+            // This is a placeholder; actual data would come from Django
+            const rows = document.querySelectorAll("#expenseTable tbody tr"); // Assuming a table exists or mock data
+            let categoryTotals = {};
+            let trendData = {};
+
+            rows.forEach(row => {
+                const dateCell = row.cells[0].textContent;
+                const statusCell = row.cells[1].textContent.toLowerCase();
+                const categoryCell = row.cells[2].textContent;
+                const amountCell = parseFloat(row.cells[3].textContent);
+                const rowDate = new Date(dateCell);
+
+                let showRow = true;
+                if (startDate && rowDate < new Date(startDate)) showRow = false;
+                if (endDate && rowDate > new Date(endDate)) showRow = false;
+                if (filterStatus !== "all" && !statusCell.includes(filterStatus)) showRow = false;
+                if (filterCategory && categoryCell !== filterCategory) showRow = false;
+
+                if (showRow && statusCell === "spent") {
+                    categoryTotals[categoryCell] = (categoryTotals[categoryCell] || 0) + amountCell;
+                    trendData[dateCell] = (trendData[dateCell] || 0) + amountCell;
+                }
+            });
+
+            document.getElementById("pieChart").textContent = `Pie Chart (Spending by Category: ${JSON.stringify(categoryTotals)})`;
+            document.getElementById("barChart").textContent = `Bar Chart (Spending by Category: ${JSON.stringify(categoryTotals)})`;
+            document.getElementById("lineChart").textContent = `Line Chart (Spending Trends: ${JSON.stringify(trendData)})`;
+        }
+
+        function updateVisualizationsCharts() {
+            // Placeholder for Chart.js or similar integration
+            applyFiltersCharts();
+        }
+    </script>
+{% endblock %}

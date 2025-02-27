@@ -1,0 +1,26 @@
+from django.urls import path
+from . import views
+
+app_name = 'spending_tracker_app'
+
+urlpatterns = [
+    path('', views.index, name='index'),
+    path('add_transaction/', views.add_transaction, name='add_transaction'),
+    path('get_transaction/<int:transaction_id>/', views.get_transaction, name='get_transaction'),
+    path('update_transaction/<int:transaction_id>/', views.update_transaction, name='update_transaction'),
+    path('delete_transaction/<int:transaction_id>/', views.delete_transaction, name='delete_transaction'),
+    path('plans/', views.plans, name='plans'),
+    path('add_plan/', views.add_plan, name='add_plan'),
+    path('get_plan/<int:plan_id>/', views.get_plan, name='get_plan'),
+    path('update_plan/<int:plan_id>/', views.update_plan, name='update_plan'),
+    path('delete_plan/<int:plan_id>/', views.delete_plan, name='delete_plan'),
+    path('generate_report/', views.generate_report, name='generate_report'),
+    path('add_category/', views.add_category, name='add_category'),
+    path('get_categories/', views.get_categories, name='get_categories'),
+    path('get_transactions/', views.get_transactions, name='get_transactions'),  # New URL for fetching transactions
+    path('charts/', views.charts, name='charts'),  # New charts page
+    path('profile/', views.profile, name='profile'),  # New profile page for AI recommendations
+    path('login/', views.login_view, name='login'),  # Custom login
+    path('logout/', views.logout_view, name='logout'),  # Custom logout
+    path('signup/', views.signup, name='signup'),
+]

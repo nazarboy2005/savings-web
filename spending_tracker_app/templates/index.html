@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Home - Spending Tracker{% endblock %}
+{% block content %}
+    <h1>SpendingTracker</h1>
+    <p>Track your daily spendings and earnings effortlessly.</p>
+
+    <div class="action-buttons">
+        <button class="add-transaction-btn" style="background-color: teal;" onclick="openTransactionForm()">Add Transaction</button>
+        <button class="add-category-btn" style="background-color: purple;" onclick="openCategoryForm()">Add Category</button>
+        <button class="get-report-btn" style="background-color: orange;" onclick="openReportModal()">Get Report</button>
+    </div>
+
+<div class="filters">
+    <form id="filterForm" method="get" action="">
+        <label for="filterStatus">Filter:</label>
+        <select name="status" id="filterStatus">
+            <option value="all" {% if not request.GET.status or request.GET.status == 'all' %}selected{% endif %}>All</option>
+            <option value="spent" {% if request.GET.status == 'spent' %}selected{% endif %}>Only Spent</option>
+            <option value="earned" {% if request.GET.status == 'earned' %}selected{% endif %}>Only Earned</option>
+        </select>
+        <label for="filterCategory">Category:</label>
+        <select name="category" id="filterCategory">
+            <option value="" {% if not request.GET.category %}selected{% endif %}>All Categories</option>
+            {% for cat in categories %}
+                <option value="{{ cat.name }}" {% if request.GET.category == cat.name %}selected{% endif %}>{{ cat.name }}</option>
+            {% endfor %}
+        </select>
+        <label for="startDate">From:</label>
+        <input type="date" name="start_date" id="startDate" value="{{ request.GET.start_date|default:'' }}">
+        <label for="endDate">To:</label>
+        <input type="date" name="end_date" id="endDate" value="{{ request.GET.end_date|default:'' }}">
+        <label for="displayCurrency">Display Currency:</label>
+        <select name="display_currency" id="displayCurrency">
+            <option value="QAR" {% if request.GET.display_currency == 'QAR' %}selected{% endif %}>QAR</option>
+            <option value="USD" {% if request.GET.display_currency == 'USD' %}selected{% endif %}>USD</option>
+            <option value="EUR" {% if request.GET.display_currency == 'EUR' %}selected{% endif %}>EUR</option>
+        </select>
+        <button type="button" id="apply-filters" style="background-color: teal;" onclick="applyFilters()">Apply Filters</button>
+    </form>
+</div>
+    <table id="expenseTable">
+    <thead>
+        <tr style="background-color: teal;">
+            <th onclick="sortTable()">Date</th>
+            <th>Status</th>
+            <th>Category</th>
+            <th>Amount</th>
+            <th>Currency</th>
+            <th>Description</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for transaction in transactions %}
+        <tr>
+            <td>{{ transaction.date }}</td>
+            <td class="{{ transaction.status }}">{{ transaction.status|title }}</td>
+            <td>{{ transaction.category__name }}</td>
+            <td>{{ transaction.amount }}</td>
+            <td>{{ transaction.currency }}</td>
+            <td>{{ transaction.description }}</td>
+            <td>
+                <button onclick="editTransaction(this, {{ transaction.id }})" style="background-color: #ff4444;">Edit</button>
+                <button onclick="deleteTransaction(this, {{ transaction.id }})" style="background-color: #ff4444;">Delete</button>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+    <div class="totals">
+        <p>Total Earned: <span id="totalEarned">0</span> <span id="earnedCurrency">QAR</span></p>
+        <p>Total Spent: <span id="totalSpent">0</span> <span id="spentCurrency">QAR</span></p>
+        <p id="totalSpentFromHome" style="display: none;">0</p>
+    </div>
+    <div class="summary" id="summary"></div>
+    <div id="budgetStatus" class="budget-status"></div> <!-- Add this for plan status update -->
+
+    <div class="visualization">
+        <h2>Visualize Your Spending</h2>
+        <p>Based on the selected date range:</p>
+        <div class="chart-placeholder" id="pieChart">Pie Chart (Spending by Category)</div>
+        <div class="chart-placeholder" id="barChart">Bar Chart (Spending by Category)</div>
+        <div class="chart-placeholder" id="lineChart">Line Chart (Spending Trends)</div>
+    </div>
+
+    <!-- Modals -->
+    <div class="modal" id="transactionModal">
+        <h3>Add Transaction</h3>
+        <form id="transactionForm">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            <label for="amount">Amount:</label>
+            <input type="number" id="amount" name="amount" required min="0" step="0.01">
+            <label for="currency">Currency:</label>
+            <select id="currency" name="currency" required>
+                <option value="QAR">QAR</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+            </select>
+            <label for="status">Spent/Earned:</label>
+            <select id="status" name="status" required>
+                <option value="">Choose</option>
+                <option value="spent">Spent</option>
+                <option value="earned">Earned</option>
+            </select>
+            <label for="category">Category:</label>
+            <select id="category" name="category" required>
+                <option value="">Choose Category</option>
+                {% for cat in categories %}
+                    <option value="{{ cat.name }}">{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+            <label for="date">Date:</label>
+            <input type="date" id="date" name="date" required>
+            <label for="description">Description:</label>
+            <textarea id="description" name="description" required></textarea>
+            <button type="button" onclick="addTransaction()" style="background-color: #00ff99;">Add</button>
+            <button type="button" onclick="closeTransactionForm()" style="background-color: #7f8c8d;">Cancel</button>
+        </form>
+    </div>
+
+    <div class="modal" id="editModal">
+        <h3>Edit Transaction</h3>
+        <form id="editForm">
+            <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+            <label for="editAmount">Amount:</label>
+            <input type="number" id="editAmount" name="amount" required min="0" step="0.01">
+            <label for="editCurrency">Currency:</label>
+            <select id="editCurrency" name="currency" required>
+                <option value="QAR">QAR</option>
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+            </select>
+            <label for="editStatus">Spent/Earned:</label>
+            <select id="editStatus" name="status" required>
+                <option value="">Choose</option>
+                <option value="spent">Spent</option>
+                <option value="earned">Earned</option>
+            </select>
+            <label for="editCategory">Category:</label>
+            <select id="editCategory" name="category" required>
+                <option value="">Choose Category</option>
+                {% for cat in categories %}
+                    <option value="{{ cat.name }}">{{ cat.name }}</option>
+                {% endfor %}
+            </select>
+            <label for="editDate">Date:</label>
+            <input type="date" id="editDate" name="date" required>
+            <label for="editDescription">Description:</label>
+            <textarea id="editDescription" name="description" required></textarea>
+            <button type="button" onclick="updateTransaction()" style="background-color: #00ff99;">Save</button>
+            <button type="button" onclick="closeEditForm()" style="background-color: #7f8c8d;">Cancel</button>
+        </form>
+    </div>
+
+    <div class="modal" id="categoryModal">
+        <h3>Add Category</h3>
+        <form id="categoryForm" method="post" action="{% url 'spending_tracker_app:add_category' %}">
+            {% csrf_token %}
+            <label for="newCategory">Category Name:</label>
+            <input type="text" id="newCategory" name="name" required placeholder="Enter category...">
+            <button type="submit" style="background-color: #9b59b6;">Add</button>
+            <button type="button" onclick="closeCategoryForm()" style="background-color: #7f8c8d;">Cancel</button>
+        </form>
+    </div>
+
+    <div class="modal" id="reportModal">
+    <h3>Generate Report</h3>
+    <form id="reportForm" method="post" action="{% url 'spending_tracker_app:generate_report' %}">
+        {% csrf_token %}
+        <label for="reportFilename">File Name:</label>
+        <input type="text" name="filename" id="reportFilename" value="report" required>
+        <label for="reportFormat">Format:</label>
+        <select name="format" id="reportFormat" required>
+            <option value="excel">Excel</option>
+            <option value="pdf">PDF</option>
+        </select>
+        <!-- Hidden fields to pass current filter parameters -->
+        <input type="hidden" name="start_date" id="reportStartDate" value="{{ request.GET.start_date|default:'' }}">
+        <input type="hidden" name="end_date" id="reportEndDate" value="{{ request.GET.end_date|default:'' }}">
+        <input type="hidden" name="status" id="reportStatus" value="{{ request.GET.status|default:'all' }}">
+        <input type="hidden" name="category" id="reportCategory" value="{{ request.GET.category|default:'' }}">
+        <input type="hidden" name="display_currency" id="reportDisplayCurrency" value="{{ request.GET.display_currency|default:'QAR' }}">
+        <button type="submit" style="background-color: #e67e22;">Generate Report</button>
+        <button type="button" onclick="closeReportModal()" style="background-color: #7f8c8d;">Cancel</button>
+    </form>
+</div>
+
+    <div class="overlay" id="overlay"></div>
+
+    <script src="{% static 'js/script.js' %}"></script>
+{% endblock %}
