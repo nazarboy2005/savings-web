@@ -1,5 +1,5 @@
 // Declare global variables once at the top
-let transactions = [];
+let transactions = []; // Single declaration to avoid SyntaxError
 let categories = [];
 let plans = [];
 
@@ -23,10 +23,28 @@ function getCookie(name) {
 document.addEventListener("DOMContentLoaded", () => {
     console.log("DOM fully loaded, checking page and buttons...");
 
-    // Run dashboard initialization on every load (remove restrictive path check)
+    // Run dashboard initialization on every load
     checkDashboardButtons();
     // Call updateTotals after page load to initialize totals based on server-rendered table
     updateTotals();
+
+    // Initialize transactions from server-rendered table
+    const table = document.getElementById("expenseTable");
+    if (table) {
+        const rows = table.querySelectorAll("tbody tr");
+        transactions = Array.from(rows).map(row => {
+            return {
+                id: parseInt(row.cells[6].querySelector('button:last-child').getAttribute('onclick').match(/\d+/)[0]) || 0,
+                date: row.cells[0].textContent || '',
+                status: row.cells[1].textContent.toLowerCase() || 'spent',
+                category__name: row.cells[2].textContent || 'undefined',
+                amount: parseFloat(row.cells[3].textContent) || 0,
+                currency: row.cells[4].textContent || 'QAR',
+                description: row.cells[5].textContent || ''
+            };
+        });
+        console.log("Initialized transactions from server-rendered table:", transactions);
+    }
 
     // Determine the current page and initialize accordingly for plans (if needed)
     const currentPath = window.location.pathname;
@@ -44,9 +62,9 @@ function checkDashboardButtons() {
     const categoryBtn = document.querySelector('.add-category-btn');
     const reportBtn = document.querySelector('.get-report-btn');
 
-    console.log("Transaction button exists:", transactionBtn);
-    console.log("Category button exists:", categoryBtn);
-    console.log("Report button exists:", reportBtn);
+    console.log("Transaction button exists:", !!transactionBtn);
+    console.log("Category button exists:", !!categoryBtn);
+    console.log("Report button exists:", !!reportBtn);
 
     // Add event listeners if buttons exist
     if (transactionBtn) {
@@ -65,38 +83,14 @@ function checkPlanButtons() {
     console.log("Checking plan buttons...");
     const planBtn = document.querySelector('.add-plan-btn');
 
-    console.log("Plan button exists:", planBtn);
+    console.log("Plan button exists:", !!planBtn);
 
     if (planBtn) {
         planBtn.addEventListener('click', openPlanForm);
     }
 }
 
-async function fetchRate(fromCur, toCur) {
-    if (fromCur === toCur) return 1;
-    const url = `https://api.exchangerate.host/latest?base=${fromCur}&symbols=${toCur}`;
-    try {
-        const response = await fetch(url);
-        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
-        const data = await response.json();
-        return data.rates[toCur] || 1;
-    } catch (error) {
-        console.error('Error fetching exchange rate:', error.message);
-        // Fallback to hardcoded rates
-        const HARD_CODED_RATES = {
-            "QAR->USD": 0.27,
-            "USD->QAR": 3.64,
-            "QAR->EUR": 0.25,
-            "EUR->QAR": 4.00,
-        };
-        return HARD_CODED_RATES[`${fromCur}->${toCur}`] || 1;
-    }
-}
-// Fetch transactions (only for dashboard page, kept for reference but not called)
-function convertAmount(amount, fromCurr, toCurr) {
-    return amount * fetchRate(fromCurr, toCurr);
-}
-// Fetch transactions with conversion
+// Fetch transactions with server-side conversion (only for dashboard page updates)
 function fetchTransactions() {
     const table = document.getElementById("expenseTable");
     if (!table) {
@@ -109,7 +103,7 @@ function fetchTransactions() {
     const startDate = document.getElementById('startDate')?.value || '';
     const endDate = document.getElementById('endDate')?.value || '';
     const displayCurrency = document.getElementById('displayCurrency')?.value || 'QAR';
-    const url = `/get_transactions/?status=${encodeURIComponent(status)}&category=${encodeURIComponent(category)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`;
+    const url = `/get_transactions/?status=${encodeURIComponent(status)}&category=${encodeURIComponent(category)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}&display_currency=${encodeURIComponent(displayCurrency)}`;
 
     fetch(url, {
         method: 'GET',
@@ -119,17 +113,9 @@ function fetchTransactions() {
         if (!response.ok) throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
         return response.json();
     })
-    .then(async data => {
-        // Convert each transaction amount to display_currency
-        const convertedTransactions = await Promise.all(data.transactions.map(async t => {
-            const convertedAmount = await convertAmount(t.amount, t.currency, displayCurrency);
-            return {
-                ...t,
-                amount: convertedAmount,
-                currency: displayCurrency,
-            };
-        }));
-        transactions = convertedTransactions || [];
+    .then(data => {
+        // Update transactions without redeclaring (use assignment)
+        transactions = data.transactions || [];
         updateTable(transactions);
         updateTotals();
         showSummary();
@@ -143,8 +129,7 @@ function fetchTransactions() {
     });
 }
 
-
-// Fetch categories (only for dashboard page, kept for reference but not called)
+// Fetch categories (only for dashboard page)
 function fetchCategories() {
     const categorySelect = document.getElementById("category");
     const editCategorySelect = document.getElementById("editCategory");
@@ -425,8 +410,15 @@ function addTransaction() {
         alert("Please fill all fields!");
         return;
     }
+
     console.log("Transaction data:", { amount, currency, status, category, date, description });
     console.log("CSRF Token:", getCookie('csrftoken'));
+
+    // Show loading indicator
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    if (loadingIndicator) loadingIndicator.style.display = "block";
+
+    const startTime = performance.now(); // Measure request time
     fetch('/add_transaction/', {
         method: 'POST',
         headers: {
@@ -446,26 +438,129 @@ function addTransaction() {
         return response.json();
     })
     .then(data => {
+        const endTime = performance.now();
+        console.log(`Transaction added in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
         console.log("Transaction data:", data);
         if (data.error) {
             alert(`Error: ${data.error}`);
             return;
         }
-        // Assign data to transactions without redeclaring
-        transactions = data.transactions;
+        // Add the new transaction to the global transactions array
+        const newTransaction = data.transaction;
+        transactions = [newTransaction, ...transactions.filter(t => t.id !== newTransaction.id)];
         updateTable(transactions);
         if (status === "spent") {
             deductFromPlans(category, amount);
         }
-        closeTransactionForm();
-        updateTotals();
-        showSummary();
-        updatePlanStatus();
-        updateVisualizations();
+        // Fetch all transactions to ensure the table is fully updated
+        fetchTransactions()
+            .then(() => {
+                closeTransactionForm();
+                updateTotals();
+                showSummary();
+                updatePlanStatus();
+                updateVisualizations();
+            })
+            .catch(error => console.error('Error fetching updated transactions:', error));
     })
     .catch(error => {
         console.error('Error adding transaction:', error.message || error);
-        alert("Failed to add transaction. Check console for details.");
+        alert(`Failed to add transaction. Status: ${error.message}. Check console for details and ensure the server is running at http://127.0.0.1:8000.`);
+    })
+    .finally(() => {
+        // Hide loading indicator when done
+        if (loadingIndicator) loadingIndicator.style.display = "none";
+    });
+}
+
+// Update transaction (only for dashboard page, fixed for date handling)
+function updateTransaction() {
+    const transactionId = document.getElementById("editForm")?.dataset.rowIndex;
+    if (!transactionId) {
+        console.error("Transaction ID not found in edit form");
+        return;
+    }
+    const amount = parseFloat(document.getElementById("editAmount").value);
+    const currency = document.getElementById("editCurrency").value;
+    const status = document.getElementById("editStatus").value;
+    const category = document.getElementById("editCategory").value;  // Get the category name directly
+    const date = document.getElementById("editDate").value;  // Already a string in 'YYYY-MM-DD' format
+    const description = document.getElementById("editDescription").value;
+
+    if (!amount || isNaN(amount) || amount < 0) {
+        alert("Please enter a valid non-negative number for amount!");
+        return;
+    }
+    if (!currency || !status || !category || !date || !description) {
+        alert("Please fill all fields!");
+        return;
+    }
+
+    console.log("Update Transaction data:", { transactionId, amount, currency, status, category, date, description });
+    console.log("CSRF Token:", getCookie('csrftoken'));
+
+    // Show loading indicator
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    if (loadingIndicator) loadingIndicator.style.display = "block";
+
+    const startTime = performance.now(); // Measure request time
+    fetch(`/update_transaction/${transactionId}/`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ amount, currency, status, category, date, description })
+    })
+    .then(response => {
+        console.log("Fetch response:", response);
+        if (!response.ok) {
+            return response.json().then(err => {
+                throw new Error(`HTTP error! status: ${response.status} - ${err.error || response.statusText}`);
+            });
+        }
+        return response.json();
+    })
+    .then(data => {
+        const endTime = performance.now();
+        console.log(`Transaction updated in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
+        console.log("Updated transaction data:", data);
+        if (data.error) {
+            alert(`Error: ${data.error}`);
+            return;
+        }
+        // Update transactions with the new data
+        const updatedTransaction = data.transaction;
+        transactions = transactions.map(t => t.id === parseInt(transactionId) ? updatedTransaction : t);
+        updateTable(transactions);
+        const oldTransaction = transactions.find(t => t.id === parseInt(transactionId));
+        if (oldTransaction) {
+            if (oldTransaction.status === "spent") {
+                addToPlans(oldTransaction.category || '', parseFloat(oldTransaction.amount)); // Revert old deduction
+            }
+            if (status === "spent") {
+                deductFromPlans(category, amount); // Deduct new amount
+            }
+        }
+        // Fetch all transactions to ensure the table is fully updated
+        fetchTransactions()
+            .then(() => {
+                closeEditForm();
+                updateTotals();
+                showSummary();
+                updatePlanStatus();
+                updateVisualizations();
+            })
+            .catch(error => console.error('Error fetching updated transactions:', error));
+    })
+    .catch(error => {
+        console.error('Error updating transaction:', error.message || error);
+        alert(`Failed to update transaction. Status: ${error.message}. Check console for details and ensure the server is running at http://127.0.0.1:8000.`);
+    })
+    .finally(() => {
+        // Hide loading indicator when done
+        if (loadingIndicator) loadingIndicator.style.display = "none";
     });
 }
 
@@ -501,7 +596,7 @@ function editTransaction(button, transactionId) {
         editCurrency.value = data.currency;
         editStatus.value = data.status;
         editCategory.value = data.category || '';
-        editDate.value = data.date;
+        editDate.value = data.date;  // Ensure date is set as a string in 'YYYY-MM-DD'
         editDescription.value = data.description || '';
         editForm.dataset.rowIndex = transactionId;
         openEditForm();
@@ -512,77 +607,6 @@ function editTransaction(button, transactionId) {
     });
 }
 
-// Update transaction (only for dashboard page)
-function updateTransaction() {
-    const transactionId = document.getElementById("editForm")?.dataset.rowIndex;
-    if (!transactionId) {
-        console.error("Transaction ID not found in edit form");
-        return;
-    }
-    const amount = parseFloat(document.getElementById("editAmount").value);
-    const currency = document.getElementById("editCurrency").value;
-    const status = document.getElementById("editStatus").value;
-    const category = document.getElementById("editCategory").value;  // Get the category name directly
-    const date = document.getElementById("editDate").value;
-    const description = document.getElementById("editDescription").value;
-
-    if (!amount || isNaN(amount) || amount < 0) {
-        alert("Please enter a valid non-negative number for amount!");
-        return;
-    }
-    if (!currency || !status || !category || !date || !description) {
-        alert("Please fill all fields!");
-        return;
-    }
-
-    fetch(`/update_transaction/${transactionId}/`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken'),
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({ amount, currency, status, category, date, description })
-    })
-    .then(response => {
-        console.log("Fetch response:", response);
-        if (!response.ok) {
-            return response.json().then(err => {
-                throw new Error(`HTTP error! status: ${response.status} - ${err.error || response.statusText}`);
-            });
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log("Updated transaction data:", data);
-        if (data.error) {
-            alert(`Error: ${data.error}`);
-            return;
-        }
-        // Assign data to transactions without redeclaring
-        transactions = data.transactions;
-        updateTable(transactions);
-        const oldTransaction = transactions.find(t => t.id === parseInt(transactionId));
-        if (oldTransaction) {
-            if (oldTransaction.status === "spent") {
-                addToPlans(oldTransaction.category || '', parseFloat(oldTransaction.amount)); // Revert old deduction
-            }
-            if (status === "spent") {
-                deductFromPlans(category, amount); // Deduct new amount
-            }
-        }
-        closeEditForm();
-        updateTotals();
-        showSummary();
-        updatePlanStatus();
-        updateVisualizations();
-    })
-    .catch(error => {
-        console.error('Error updating transaction:', error.message || error);
-        alert("Failed to update transaction. Check console for details.");
-    });
-}
-
 // Delete transaction (only for dashboard page)
 function deleteTransaction(button, transactionId) {
     console.log("Delete Transaction clicked for ID:", transactionId);
@@ -590,7 +614,23 @@ function deleteTransaction(button, transactionId) {
         console.error("Invalid button or transaction ID:", { button, transactionId });
         return;
     }
-    if (confirm("Are you sure you want to delete this transaction?")) {
+
+    // Show confirmation modal
+    const confirmModal = document.getElementById("confirmDeleteModal");
+    const confirmYesBtn = document.getElementById("confirmYes");
+    const confirmNoBtn = document.getElementById("confirmNo");
+    if (!confirmModal || !confirmYesBtn || !confirmNoBtn) {
+        console.error("Delete confirmation modal or buttons not found");
+        alert("Failed to show delete confirmation. Modal setup issue.");
+        return;
+    }
+
+    confirmModal.style.display = "block";
+    document.getElementById("overlay").style.display = "block";
+    confirmModal.dataset.transactionId = transactionId; // Store transaction ID in modal data
+
+    // Handle confirmation
+    confirmYesBtn.onclick = function() {
         fetch(`/delete_transaction/${transactionId}/`, {
             method: 'POST',
             headers: {
@@ -611,10 +651,25 @@ function deleteTransaction(button, transactionId) {
         .then(data => {
             console.log("Deleted transaction data:", data);
             if (data.error) {
-                alert(`Error: ${data.error}`);
+                // Show error message in a modal
+                const errorModal = document.getElementById("deleteErrorModal");
+                const errorMessage = document.getElementById("deleteErrorMessage");
+                const errorOkBtn = document.getElementById("deleteErrorOk");
+                if (!errorModal || !errorMessage || !errorOkBtn) {
+                    console.error("Delete error modal or elements not found");
+                    alert(`Error deleting transaction: ${data.error}`);
+                    return;
+                }
+                errorMessage.textContent = `Error: ${data.error}`;
+                errorModal.style.display = "block";
+                document.getElementById("overlay").style.display = "block";
+                errorOkBtn.onclick = function() {
+                    errorModal.style.display = "none";
+                    document.getElementById("overlay").style.display = "none";
+                };
                 return;
             }
-            // Assign data to transactions without redeclaring
+            // Update transactions without redeclaring (use assignment)
             transactions = data.transactions;
             updateTable(transactions);
             const transaction = transactions.find(t => t.id === parseInt(transactionId));
@@ -625,15 +680,58 @@ function deleteTransaction(button, transactionId) {
             showSummary();
             updatePlanStatus();
             updateVisualizations();
+
+            // Show success message in a modal
+            const successModal = document.getElementById("deleteSuccessModal");
+            const successOkBtn = document.getElementById("deleteSuccessOk");
+            if (!successModal || !successOkBtn) {
+                console.error("Delete success modal or button not found");
+                alert("Transaction deleted successfully.");
+                return;
+            }
+            successModal.style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+            successOkBtn.onclick = function() {
+                successModal.style.display = "none";
+                document.getElementById("overlay").style.display = "none";
+            };
         })
         .catch(error => {
             console.error('Error deleting transaction:', error.message || error);
-            alert("Failed to delete transaction. Check console for details.");
+            // Show error message in a modal
+            const errorModal = document.getElementById("deleteErrorModal");
+            const errorMessage = document.getElementById("deleteErrorMessage");
+            const errorOkBtn = document.getElementById("deleteErrorOk");
+            if (!errorModal || !errorMessage || !errorOkBtn) {
+                console.error("Delete error modal or elements not found");
+                alert(`Failed to delete transaction. Status: ${error.message}`);
+                return;
+            }
+            errorMessage.textContent = `Failed to delete transaction. Status: ${error.message}`;
+            errorModal.style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+            errorOkBtn.onclick = function() {
+                errorModal.style.display = "none";
+                document.getElementById("overlay").style.display = "none";
+            };
+        })
+        .finally(() => {
+            confirmModal.style.display = "none";
+            document.getElementById("overlay").style.display = "none";
+            confirmYesBtn.onclick = null; // Clear event listener to prevent duplicates
+            confirmNoBtn.onclick = null; // Clear event listener to prevent duplicates
         });
-    }
+    };
+
+    confirmNoBtn.onclick = function() {
+        confirmModal.style.display = "none";
+        document.getElementById("overlay").style.display = "none";
+        confirmYesBtn.onclick = null; // Clear event listener to prevent duplicates
+        confirmNoBtn.onclick = null; // Clear event listener to prevent duplicates
+    };
 }
 
-// Apply filters (only for dashboard page, optional but retained for debugging)
+// Apply filters (only for dashboard page)
 function applyFilters() {
     const filterForm = document.getElementById("filterForm");
     if (!filterForm) {
@@ -677,7 +775,7 @@ function sortTable() {
     updateTotals();
 }
 
-// Update transaction table (only for dashboard page, kept for reference but not called)
+// Update transaction table (only for dashboard page)
 function updateTable(transactionsData) {
     const table = document.getElementById("expenseTable");
     if (!table) {
@@ -708,7 +806,7 @@ function updateTable(transactionsData) {
     updateTotals();
 }
 
-// Update totals with conversion (if client-side)
+// Update totals (only for dashboard page)
 function updateTotals() {
     const table = document.getElementById("expenseTable");
     if (!table) {
@@ -745,6 +843,7 @@ function updateTotals() {
         console.error("Total elements not found");
     }
 }
+
 // Show summary (only for dashboard page)
 function showSummary() {
     const summaryDiv = document.getElementById("summary");
@@ -969,6 +1068,7 @@ function updatePlan() {
             alert(`Error: ${data.error}`);
             return;
         }
+        // Update plans without redeclaring (use assignment)
         plans = data.plans;
         updatePlanTable();
         closeEditPlanForm();
@@ -1010,6 +1110,7 @@ function deletePlan(planId) {
                 alert(`Error: ${data.error}`);
                 return;
             }
+            // Update plans without redeclaring (use assignment)
             plans = data.plans;
             updatePlanTable();
             updatePlanStatus();
@@ -1081,13 +1182,40 @@ function generateReport() {
     const filename = document.getElementById("reportFilename").value || "report";
     const format = document.getElementById("reportFormat").value || "excel";
 
-    if (format === "excel") {
-        console.log("Excel report generated:", reportData);
-        alert(`Excel report "${filename}.xlsx" would be generated with this data: ${JSON.stringify(reportData)}`);
-    } else if (format === "pdf") {
-        console.log("PDF report generated:", reportData);
-        alert(`PDF report "${filename}.pdf" would be generated with this data: ${JSON.stringify(reportData)}`);
-    }
-
-    closeReportModal();
+    fetch('/generate_report/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({
+            start_date: startDate,
+            end_date: endDate,
+            status: document.getElementById("filterStatus")?.value || "all",
+            category: document.getElementById("filterCategory")?.value || "",
+            format: format,
+            filename: filename,
+            display_currency: document.getElementById("displayCurrency")?.value || "QAR"
+        })
+    })
+    .then(response => {
+        if (!response.ok) throw new Error(`HTTP error! Status: ${response.status}`);
+        return response.blob();
+    })
+    .then(blob => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${filename}.${format}`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        closeReportModal();
+    })
+    .catch(error => {
+        console.error('Error generating report:', error.message || error);
+        alert("Failed to generate report. Check console for details.");
+    });
 }

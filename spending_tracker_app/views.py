@@ -273,14 +273,14 @@ def profile(request):
 def add_transaction(request):
     if request.method == "POST" and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
-            # Explicitly check if request is defined
             if not request:
                 logger.error("Request object is not defined in add_transaction")
                 return JsonResponse({'error': 'Internal server error: Request object missing'}, status=500)
 
             data = json.loads(request.body)
             logger.debug(f"Add transaction data: {data}")
-            # Validate amount as a number
+
+            # Validate amount
             amount_str = str(data.get('amount', 0))
             try:
                 amount = Decimal(amount_str)
@@ -289,52 +289,145 @@ def add_transaction(request):
             except (ValueError, InvalidOperation):
                 return JsonResponse({'error': 'Field "amount" expected a number'}, status=400)
 
-            # Handle category as a name (string), not an ID
+            # Handle category
             category_name = data.get('category', '')
             if not category_name or not isinstance(category_name, str):
                 return JsonResponse({'error': 'Category name is required and must be a string'}, status=400)
 
-            # Get or create the category for the user
             category, created = Category.objects.get_or_create(name=category_name, user=request.user)
 
+            # Handle date
+            date_str = data.get('date', datetime.date.today().strftime('%Y-%m-%d'))
+            try:
+                date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                logger.error(f"Invalid date format for transaction: {date_str}")
+                date = datetime.date.today()
+
+            # Create transaction
             transaction = Transaction.objects.create(
                 user=request.user,
-                date=data.get('date'),
-                status=data.get('status'),
-                category=category,  # Use the category object directly
+                date=date,
+                status=data.get('status', 'spent'),
+                category=category,
                 amount=amount,
                 currency=data.get('currency', 'QAR'),
                 description=data.get('description', '')
             )
-            if transaction.status == 'spent':
-                # Pass request.user to the helper function
-                deduct_from_plans(request.user, transaction.category.name if transaction.category else '',
-                                  float(transaction.amount))
-            # Convert the transaction for the response
-            display_currency = request.GET.get('display_currency', 'QAR')  # Get from query params if available
-            converted_amount = convert_currency(transaction.amount, transaction.currency, display_currency)
 
-            transactions = Transaction.objects.filter(user=request.user).order_by('-date').values(
-                'id', 'date', 'status', 'category__name', 'amount', 'currency', 'description'
-            )
-            converted_transactions = []
-            for t in transactions:
-                conv_amount = convert_currency(Decimal(str(t['amount'])), t['currency'], display_currency)
-                converted_transactions.append({
-                    'id': t['id'],
-                    'date': t['date'],
-                    'status': t['status'],
-                    'category__name': t['category__name'],
-                    'amount': float(conv_amount),
-                    'currency': display_currency,
-                    'description': t['description'],
-                })
-            return JsonResponse({'transactions': converted_transactions}, encoder=DjangoJSONEncoder, safe=False)
+            # Handle plan deduction (simplified for speed)
+            if transaction.status == 'spent':
+                deduct_from_plans(request.user, category.name, float(amount))
+
+            # Return only the new transaction for immediate response
+            display_currency = request.GET.get('display_currency', 'QAR')
+            if display_currency == 'Auto':
+                converted_amount = transaction.amount
+                currency = transaction.currency
+                exchange_rate = Decimal('1')
+            else:
+                converted_amount = convert_currency(transaction.amount, transaction.currency, display_currency)
+                currency = display_currency
+                exchange_rate = get_exchange_rate(transaction.currency, display_currency)
+
+            return JsonResponse({
+                'transaction': {
+                    'id': transaction.id,
+                    'date': date.strftime('%Y-%m-%d'),
+                    'status': transaction.status,
+                    'category__name': category.name,
+                    'amount': float(converted_amount),
+                    'currency': currency,
+                    'description': transaction.description,
+                    'exchange_rate': float(exchange_rate) if display_currency != 'Auto' else None,
+                    'original_currency': transaction.currency,
+                    'original_amount': float(transaction.amount),
+                }
+            }, encoder=DjangoJSONEncoder, safe=False)
+
         except Exception as e:
             logger.error(f"Error in add_transaction: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
+@login_required
+def update_transaction(request, transaction_id):
+    if request.method == "POST" and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            data = json.loads(request.body)
+            logger.debug(f"Update transaction data: {data}")
+            transaction = get_object_or_404(Transaction, id=transaction_id, user=request.user)
+            old_amount = float(transaction.amount)
+            old_category = transaction.category.name if transaction.category else ''
+            old_status = transaction.status
+
+            # Update transaction fields
+            # Handle date as string and convert to date object
+            date_str = data.get('date', transaction.date.strftime('%Y-%m-%d'))  # Default to current date if not provided
+            try:
+                date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
+            except ValueError:
+                logger.error(f"Invalid date format for transaction {transaction_id}: {date_str}")
+                date = transaction.date  # Fallback to existing date
+
+            transaction.date = date
+            transaction.status = data.get('status', transaction.status)
+            category_name = data.get('category', transaction.category.name if transaction.category else '')
+            if not category_name or not isinstance(category_name, str):
+                return JsonResponse({'error': 'Category name is required and must be a string'}, status=400)
+            category, created = Category.objects.get_or_create(name=category_name, user=request.user)
+            transaction.category = category
+
+            amount_str = str(data.get('amount', str(transaction.amount)))
+            try:
+                amount = Decimal(amount_str)
+                if amount < 0:
+                    return JsonResponse({'error': 'Amount must be non-negative'}, status=400)
+            except (ValueError, InvalidOperation):
+                return JsonResponse({'error': 'Field "amount" expected a number'}, status=400)
+            transaction.amount = amount
+            transaction.currency = data.get('currency', transaction.currency)
+            transaction.description = data.get('description', transaction.description)
+            transaction.save()
+
+            # Handle plan updates
+            if transaction.status == 'spent':
+                deduct_from_plans(request.user, category.name, float(amount))
+                if old_status == 'earned' or old_category != category.name or old_amount != float(amount):
+                    add_to_plans(request.user, old_category, old_amount)
+            elif transaction.status == 'earned' and old_status == 'spent':
+                add_to_plans(request.user, old_category, old_amount)
+
+            # Return only the updated transaction for immediate response
+            display_currency = request.GET.get('display_currency', 'QAR')
+            if display_currency == 'Auto':
+                converted_amount = transaction.amount
+                currency = transaction.currency
+                exchange_rate = Decimal('1')
+            else:
+                converted_amount = convert_currency(transaction.amount, transaction.currency, display_currency)
+                currency = display_currency
+                exchange_rate = get_exchange_rate(transaction.currency, display_currency)
+
+            return JsonResponse({
+                'transaction': {
+                    'id': transaction.id,
+                    'date': transaction.date.strftime('%Y-%m-%d'),
+                    'status': transaction.status,
+                    'category__name': category.name,
+                    'amount': float(converted_amount),
+                    'currency': currency,
+                    'description': transaction.description,
+                    'exchange_rate': float(exchange_rate) if display_currency != 'Auto' else None,
+                    'original_currency': transaction.currency,
+                    'original_amount': float(transaction.amount),
+                }
+            }, encoder=DjangoJSONEncoder, safe=False)
+
+        except Exception as e:
+            logger.error(f"Error in update_transaction for ID {transaction_id}: {str(e)}")
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Invalid request method'}, status=400)
 
 @login_required
 def get_transaction(request, transaction_id):
@@ -393,75 +486,6 @@ def delete_transaction(request, transaction_id):
             return JsonResponse({'transactions': converted_transactions}, encoder=DjangoJSONEncoder, safe=False)
         except Exception as e:
             logger.error(f"Error in delete_transaction for ID {transaction_id}: {str(e)}")
-            return JsonResponse({'error': str(e)}, status=500)
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
-
-
-@login_required
-def update_transaction(request, transaction_id):
-    if request.method == "POST" and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
-        try:
-            data = json.loads(request.body)
-            logger.debug(f"Update transaction data: {data}")
-            transaction = get_object_or_404(Transaction, id=transaction_id, user=request.user)
-            old_amount = float(transaction.amount)
-            old_category = transaction.category.name if transaction.category else ''
-            old_status = transaction.status
-            transaction.date = data.get('date', transaction.date)  # Default to existing date if not provided
-            transaction.status = data.get('status', transaction.status)  # Default to existing status
-            # Handle category as a name (string), not an ID
-            category_name = data.get('category', transaction.category.name if transaction.category else '')
-            if not category_name or not isinstance(category_name, str):
-                return JsonResponse({'error': 'Category name is required and must be a string'}, status=400)
-            category, created = Category.objects.get_or_create(name=category_name, user=request.user)
-            transaction.category = category  # Use the category object directly
-            # Validate amount as a number
-            amount_str = str(data.get('amount', str(transaction.amount)))  # Default to existing amount if not provided
-            try:
-                amount = Decimal(amount_str)
-                if amount < 0:
-                    return JsonResponse({'error': 'Amount must be non-negative'}, status=400)
-            except (ValueError, InvalidOperation):
-                return JsonResponse({'error': 'Field "amount" expected a number'}, status=400)
-            transaction.amount = amount
-            transaction.currency = data.get('currency', transaction.currency)  # Default to existing currency
-            transaction.description = data.get('description',
-                                               transaction.description)  # Default to existing description
-            transaction.save()
-
-            if transaction.status == 'spent':
-                # Pass request.user to the helper function
-                deduct_from_plans(request.user, transaction.category.name if transaction.category else '',
-                                  float(transaction.amount))
-                if old_status == 'earned' or (
-                        old_category and old_category != transaction.category.name) or old_amount != float(
-                        transaction.amount):
-                    # Pass request.user to the helper function
-                    add_to_plans(request.user, old_category, old_amount)
-            elif transaction.status == 'earned' and old_status == 'spent':
-                # Pass request.user to the helper function
-                add_to_plans(request.user, old_category, old_amount)
-
-            # Convert transactions for the response
-            display_currency = request.GET.get('display_currency', 'QAR')  # Get from query params if available
-            transactions = Transaction.objects.filter(user=request.user).order_by('-date').values(
-                'id', 'date', 'status', 'category__name', 'amount', 'currency', 'description'
-            )
-            converted_transactions = []
-            for t in transactions:
-                conv_amount = convert_currency(Decimal(str(t['amount'])), t['currency'], display_currency)
-                converted_transactions.append({
-                    'id': t['id'],
-                    'date': t['date'],
-                    'status': t['status'],
-                    'category__name': t['category__name'],
-                    'amount': float(conv_amount),
-                    'currency': display_currency,
-                    'description': t['description'],
-                })
-            return JsonResponse({'transactions': converted_transactions}, encoder=DjangoJSONEncoder, safe=False)
-        except Exception as e:
-            logger.error(f"Error in update_transaction for ID {transaction_id}: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
