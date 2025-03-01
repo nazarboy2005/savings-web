@@ -191,6 +191,8 @@ function fetchPlans() {
 }
 
 // Modal functions
+// ... (Keep all other functions unchanged) ...
+
 function openTransactionForm() {
     console.log("Opening transaction form...");
     const transactionModal = document.getElementById("transactionModal");
@@ -200,18 +202,27 @@ function openTransactionForm() {
         showMessageModal("Modal or category select not found!", true);
         return;
     }
+
+    // Open modal immediately
+    transactionModal.style.display = "block";
+    document.getElementById("overlay").style.display = "block";
+
+    // Fetch categories in background if needed
     if (categories.length === 0) {
-        fetchCategories().then(() => {
-            populateCategoryDropdown("category");
-            transactionModal.style.display = "block";
-            document.getElementById("overlay").style.display = "block";
-        }).catch(error => console.error('Error fetching categories:', error));
+        fetchCategories()
+            .then(() => {
+                populateCategoryDropdown("category");
+            })
+            .catch(error => {
+                console.error('Error fetching categories:', error);
+                showMessageModal("Failed to load categories.", true);
+            });
     } else {
-        populateCategoryDropdown("category");
-        transactionModal.style.display = "block";
-        document.getElementById("overlay").style.display = "block";
+        populateCategoryDropdown("category"); // Populate instantly if categories are available
     }
 }
+
+// ... (Keep all other functions unchanged) ...
 
 function closeTransactionForm() {
     const transactionModal = document.getElementById("transactionModal");
@@ -1167,6 +1178,10 @@ function addTransaction() {
 
     const startTime = performance.now(); // Measure performance
 
+    // Optimistic UI update: close form and show success message instantly
+    closeTransactionForm();
+    showMessageModal("Transaction added successfully!", false); // Immediate feedback
+
     fetch('/add_transaction/', {
         method: 'POST',
         headers: {
@@ -1186,56 +1201,44 @@ function addTransaction() {
     .then(data => {
         console.log("Response data:", data);
         const endTime = performance.now();
-        console.log(`Initial fetch completed in ${ (endTime - startTime).toFixed(2) }ms`);
-
-        // Close the form immediately after successful response
-        closeTransactionForm();
-        showMessageModal("Transaction added successfully", false); // Optional loading feedback
+        console.log(`Initial fetch completed in ${(endTime - startTime).toFixed(2)}ms`);
 
         if (data.error) {
+            closeMessageModal(); // Clear success message on error
             showMessageModal(`Error: ${data.error}`, true);
-        } else {
-            if (data.transaction) {
-                const newTransaction = data.transaction;
-                transactions = [newTransaction, ...transactions.filter(t => t.id !== newTransaction.id)];
-                updateTable(transactions);
-            }
-            // Refresh data in background
-            fetchTransactions().then(() => {
-                closeMessageModal(); // Clear loading message
-                updateTotals();
-                showSummary();
-                updatePlanStatus();
-                updateVisualizations();
-                showMessageModal("Transaction added successfully!");
-            }).catch(error => {
-                console.error('Error fetching updated transactions:', error);
-                closeMessageModal(); // Clear loading message
-                showMessageModal("Transaction added, but failed to refresh data.", false);
-            });
+            transactions = transactions.filter(t => t.id !== (data.transaction ? data.transaction.id : 0)); // Remove optimistic add
+            updateTable(transactions);
+        } else if (data.transaction) {
+            const newTransaction = data.transaction;
+            transactions.unshift(newTransaction); // Add new transaction optimistically
+            updateTable(transactions); // Update table instantly
         }
     })
     .catch(error => {
         console.error('Error adding transaction:', error);
-        closeTransactionForm(); // Ensure form closes on error
         const endTime = performance.now();
-        console.log(`Error handling completed in ${ (endTime - startTime).toFixed(2) }ms`);
+        console.log(`Error handling completed in ${(endTime - startTime).toFixed(2)}ms`);
+        closeMessageModal(); // Clear success message on error
         if (error.message.includes('HTTP error')) {
             showMessageModal(`Failed to add transaction. Status: ${error.message}`, true);
-        } else {
-            fetchTransactions().then(() => {
-                closeMessageModal(); // Clear any loading message
-                updateTotals();
-                showSummary();
-                updatePlanStatus();
-                updateVisualizations();
-                showMessageModal("Transaction added successfully (error recovery)!");
-            }).catch(err => {
-                console.error('Error in recovery fetch:', err);
-                closeMessageModal(); // Clear loading message
-                showMessageModal("Transaction added, but failed to refresh data.", false);
-            });
+            transactions.pop(); // Remove last optimistic add
+            updateTable(transactions);
         }
+    })
+    .finally(() => {
+        // Background refresh to sync with server silently
+        setTimeout(() => {
+            fetchTransactions()
+                .then(() => {
+                    updateTotals();
+                    showSummary();
+                    updatePlanStatus();
+                    updateVisualizations();
+                })
+                .catch(err => {
+                    console.error('Error fetching updated transactions:', err);
+                });
+        }, 0); // Non-blocking background task
     });
 }
 
@@ -1812,5 +1815,78 @@ function addToPlans(category, amount) {
             plan.left_money += amount;
             updatePlanTable();
         }
+    });
+}
+
+function addCategory(event) {
+    // Prevent form submission if called from a form event
+    if (event) event.preventDefault();
+
+    console.log("Add Category clicked");
+    const categoryName = document.getElementById("categoryName").value; // Adjust ID based on your form
+
+    if (!categoryName || categoryName.trim() === "") {
+        showMessageModal("Please enter a category name!", true);
+        return;
+    }
+
+    console.log("Sending category data:", { name: categoryName });
+    console.log("CSRF Token:", getCookie('csrftoken'));
+
+    const startTime = performance.now(); // Measure performance
+
+    // Optimistic UI update: close form and show success message instantly
+    closeCategoryForm();
+    showMessageModal("Category added successfully!", false); // Immediate feedback
+
+    fetch('/add_category/', { // Adjust endpoint based on your URL
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ name: categoryName })
+    })
+    .then(response => {
+        console.log("Fetch response status:", response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        console.log("Response data:", data);
+        const endTime = performance.now();
+        console.log(`Initial fetch completed in ${(endTime - startTime).toFixed(2)}ms`);
+
+        if (data.error) {
+            closeMessageModal(); // Clear success message on error
+            showMessageModal(`Error: ${data.error}`, true);
+            // Optionally revert UI if needed (e.g., reopen modal)
+        } else if (data.category) {
+            categories.unshift(data.category); // Add new category optimistically if tracked
+            updateCategoryTable(categories); // Update table instantly if applicable
+        }
+    })
+    .catch(error => {
+        console.error('Error adding category:', error);
+        const endTime = performance.now();
+        console.log(`Error handling completed in ${(endTime - startTime).toFixed(2)}ms`);
+        closeMessageModal(); // Clear success message on error
+        showMessageModal(`Failed to add category. Status: ${error.message}`, true);
+        // Optionally revert UI if needed
+    })
+    .finally(() => {
+        // Background refresh to sync with server silently
+        setTimeout(() => {
+            fetchCategories() // Adjust endpoint based on your URL
+                .then(() => {
+                    updateCategoryTable(categories); // Update table if applicable
+                })
+                .catch(err => {
+                    console.error('Error fetching updated categories:', err);
+                });
+        }, 0); // Non-blocking background task
     });
 }
