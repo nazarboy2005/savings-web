@@ -133,14 +133,30 @@ p {
     background-color: #00ffcc;
 }
 
-table {
+/* ... (Keep all existing CSS unchanged until table section) ... */
+
+.table-wrapper {
     width: 95%;
-    margin: 10px auto;
+    margin: 0 auto;
+}
+
+table {
+    width: 95%; /* Relative to table-wrapper */
+    margin: 0 auto; /* Center the table */
     border-collapse: collapse;
     background-color: #1e2336;
     border-radius: 5px;
     overflow: hidden;
+    table-layout: fixed; /* Enforce fixed layout */
 }
+
+th:nth-child(1), td:nth-child(1) { width: 80px; } /* Date */
+th:nth-child(2), td:nth-child(2) { width: 80px; } /* Status */
+th:nth-child(3), td:nth-child(3) { width: 120px; } /* Category */
+th:nth-child(4), td:nth-child(4) { width: 100px; } /* Amount */
+th:nth-child(5), td:nth-child(5) { width: 80px; } /* Currency */
+th:nth-child(6), td:nth-child(6) { width: 200px; } /* Description */
+th:nth-child(7), td:nth-child(7) { width: 120px; } /* Actions */
 
 th {
     background-color: #00d4b4;
@@ -157,6 +173,27 @@ td {
     padding: 10px;
     text-align: left;
     border-bottom: 1px solid #3a4060;
+    max-width: 0; /* Allow content to determine initial width */
+    overflow: hidden; /* Hide overflow if wrapping fails */
+    white-space: normal; /* Allow wrapping */
+    word-wrap: break-word; /* Ensure long words wrap */
+    overflow-wrap: break-word; /* Fallback for older browsers */
+}
+
+.category-cell {
+    max-width: 120px !important; /* Fixed width for Category with higher specificity */
+    min-width: 120px !important; /* Prevent shrinking below this */
+    white-space: normal;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+}
+
+.description-cell {
+    max-width: 200px !important; /* Fixed width for Description with higher specificity */
+    min-width: 200px !important; /* Prevent shrinking below this */
+    white-space: normal;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
 }
 
 .earned {
@@ -165,9 +202,11 @@ td {
 }
 
 .spent {
-    background-color: #ff4444; /* Red from image */
+    background-color: #ff4444;
     color: #660000;
 }
+
+/* ... (Keep all remaining CSS unchanged) ... */
 
 .totals, .summary {
     margin: 10px auto;
