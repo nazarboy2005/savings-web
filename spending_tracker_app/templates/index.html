@@ -155,16 +155,20 @@
     </form>
 </div>
 
+<!-- ... (Keep all existing HTML unchanged until categoryModal) -->
+
 <div class="modal" id="categoryModal">
     <h3>Add Category</h3>
-    <form id="categoryForm" method="post" action="{% url 'spending_tracker_app:add_category' %}">
-        {% csrf_token %}
+    <form id="categoryForm">
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
         <label for="newCategory">Category Name:</label>
         <input type="text" id="newCategory" name="name" required placeholder="Enter category...">
         <button type="submit" style="background-color: #9b59b6;">Add</button>
         <button type="button" onclick="closeCategoryForm()" style="background-color: #7f8c8d;">Cancel</button>
     </form>
 </div>
+
+<!-- ... (Keep all other modals and content unchanged) -->
 
 <div class="modal" id="editCategoryModal">
     <h3>Edit Category</h3>

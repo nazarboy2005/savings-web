@@ -49,6 +49,15 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (currentPath === '/categories/') {
         fetchCategories().then(() => updateCategoryTable(categories));
     }
+
+    // Prevent default form submission for category form
+    const categoryForm = document.getElementById("categoryForm");
+    if (categoryForm) {
+        categoryForm.addEventListener("submit", (event) => {
+            event.preventDefault();
+            addCategory(event); // Trigger AJAX call
+        });
+    }
 });
 
 // Check buttons on the dashboard page
@@ -191,8 +200,6 @@ function fetchPlans() {
 }
 
 // Modal functions
-// ... (Keep all other functions unchanged) ...
-
 function openTransactionForm() {
     console.log("Opening transaction form...");
     const transactionModal = document.getElementById("transactionModal");
@@ -202,27 +209,18 @@ function openTransactionForm() {
         showMessageModal("Modal or category select not found!", true);
         return;
     }
-
-    // Open modal immediately
-    transactionModal.style.display = "block";
-    document.getElementById("overlay").style.display = "block";
-
-    // Fetch categories in background if needed
     if (categories.length === 0) {
-        fetchCategories()
-            .then(() => {
-                populateCategoryDropdown("category");
-            })
-            .catch(error => {
-                console.error('Error fetching categories:', error);
-                showMessageModal("Failed to load categories.", true);
-            });
+        fetchCategories().then(() => {
+            populateCategoryDropdown("category");
+            transactionModal.style.display = "block";
+            document.getElementById("overlay").style.display = "block";
+        }).catch(error => console.error('Error fetching categories:', error));
     } else {
-        populateCategoryDropdown("category"); // Populate instantly if categories are available
+        populateCategoryDropdown("category");
+        transactionModal.style.display = "block";
+        document.getElementById("overlay").style.display = "block";
     }
 }
-
-// ... (Keep all other functions unchanged) ...
 
 function closeTransactionForm() {
     const transactionModal = document.getElementById("transactionModal");
@@ -279,6 +277,83 @@ function openCategoryForm() {
     document.getElementById("overlay").style.display = "block";
 }
 
+function addCategory(event) {
+    // Prevent default form submission
+    if (event) event.preventDefault();
+
+    console.log("Add Category clicked");
+    const categoryName = document.getElementById("newCategory").value; // Corrected ID to match index.html
+
+    if (!categoryName || categoryName.trim() === "") {
+        showMessageModal("Please enter a category name!", true);
+        return;
+    }
+
+    console.log("Sending category data:", { name: categoryName });
+    console.log("CSRF Token:", getCookie('csrftoken'));
+
+    // Show loading indicator
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    if (loadingIndicator) loadingIndicator.style.display = "block";
+
+    const startTime = performance.now(); // Measure performance
+
+    // Optimistic UI update: close form and show success message instantly
+    closeCategoryForm();
+    showMessageModal("Adding category...", false); // Immediate feedback
+
+    fetch('/add_category/', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'X-CSRFToken': getCookie('csrftoken'),
+            'X-Requested-With': 'XMLHttpRequest'
+        },
+        body: JSON.stringify({ name: categoryName })
+    })
+    .then(response => {
+        console.log("Fetch response status:", response.status);
+        if (!response.ok) {
+            throw new Error(`HTTP error! Status: ${response.status}`);
+        }
+        return response.json();
+    })
+    .then(data => {
+        const endTime = performance.now();
+        console.log(`Category added in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
+        console.log("Category data:", data);
+        if (data.error) {
+            closeMessageModal(); // Clear loading message on error
+            showMessageModal(`Error: ${data.error}`, true);
+            // Optionally reopen modal or revert UI
+            openCategoryForm(); // Reopen modal on error
+        } else {
+            // Update categories without redeclaring (use assignment)
+            categories = data.categories || [];
+            // Update category dropdowns and table immediately
+            populateCategoryDropdown("category");
+            populateCategoryDropdown("editCategory");
+            populateFilterCategoryDropdown();
+            if (document.getElementById("categoryTable")) {
+                updateCategoryTable(categories);
+            }
+            showMessageModal("Category added successfully!", false);
+        }
+    })
+    .catch(error => {
+        console.error('Error adding category:', error.message || error);
+        const endTime = performance.now();
+        console.log(`Error handling completed in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
+        closeMessageModal(); // Clear loading message on error
+        showMessageModal(`Failed to add category. Status: ${error.message}. Check console for details.`, true);
+        openCategoryForm(); // Reopen modal on error
+    })
+    .finally(() => {
+        // Hide loading indicator when done
+        if (loadingIndicator) loadingIndicator.style.display = "none";
+    });
+}
+
 function closeCategoryForm() {
     const categoryModal = document.getElementById("categoryModal");
     if (!categoryModal) {
@@ -287,6 +362,7 @@ function closeCategoryForm() {
     }
     categoryModal.style.display = "none";
     document.getElementById("overlay").style.display = "none";
+    document.getElementById("categoryForm").reset();
 }
 
 function editCategory(categoryId, categoryName) {
@@ -348,6 +424,12 @@ function deleteCategory() {
         return;
     }
 
+    // Show loading indicator
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    if (loadingIndicator) loadingIndicator.style.display = "block";
+
+    const startTime = performance.now(); // Measure performance
+
     fetch(`/delete_category/${categoryId}/`, {
         method: 'POST',
         headers: {
@@ -364,19 +446,27 @@ function deleteCategory() {
         return response.json();
     })
     .then(data => {
+        const endTime = performance.now();
+        console.log(`Category deleted in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
         console.log("Delete category response data:", data);
         if (data.error) {
             showMessageModal(`Error: ${data.error}`, true);
         } else {
             categories = data.categories || [];
             updateCategoryTable(categories);
-            showMessageModal("Category and associated spendings deleted successfully!");
+            showMessageModal("Category and associated spendings deleted successfully!", false);
             closeConfirmDeleteCategoryModal();
         }
     })
     .catch(error => {
         console.error('Error deleting category:', error);
+        const endTime = performance.now();
+        console.log(`Error handling completed in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
         showMessageModal('Failed to delete category. Check console for details.', true);
+    })
+    .finally(() => {
+        // Hide loading indicator when done
+        if (loadingIndicator) loadingIndicator.style.display = "none";
     });
 }
 
@@ -391,6 +481,12 @@ function updateCategory() {
 
     console.log("Sending update data for category ID:", categoryId, { category_id: categoryId, name: categoryName });
     console.log("CSRF Token:", getCookie('csrftoken'));
+
+    // Show loading indicator
+    const loadingIndicator = document.getElementById("loadingIndicator");
+    if (loadingIndicator) loadingIndicator.style.display = "block";
+
+    const startTime = performance.now(); // Measure performance
 
     fetch('/update_category/', {
         method: 'POST',
@@ -416,9 +512,10 @@ function updateCategory() {
         return response.json();
     })
     .then(data => {
+        const endTime = performance.now();
+        console.log(`Category updated in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
         console.log("Update category response data:", data);
         if (data.error) {
-            // Customize error message for duplicate category
             if (data.error.toLowerCase().includes('already') || data.error.toLowerCase().includes('exists') || data.error.toLowerCase().includes('in use')) {
                 showMessageModal(`Oops! The category "${categoryName}" already exists. Please choose a different name.`, true);
             } else {
@@ -427,12 +524,17 @@ function updateCategory() {
         } else {
             categories = data.categories || [];
             updateCategoryTable(categories);
+            populateCategoryDropdown("category");
+            populateCategoryDropdown("editCategory");
+            populateFilterCategoryDropdown();
             showMessageModal("Great! Your category has been updated successfully.", false);
             closeEditCategoryForm();
         }
     })
     .catch(error => {
         console.error('Error updating category:', error.message);
+        const endTime = performance.now();
+        console.log(`Error handling completed in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
         closeEditCategoryForm(); // Close the form on error
         let errorMessage = error.message;
         if (errorMessage.includes('Validation error') || errorMessage.includes('check your input')) {
@@ -444,6 +546,10 @@ function updateCategory() {
         } else {
             showMessageModal("Sorry, something unexpected happened. Please try again later!", true);
         }
+    })
+    .finally(() => {
+        // Hide loading indicator when done
+        if (loadingIndicator) loadingIndicator.style.display = "none";
     });
 }
 
@@ -472,44 +578,45 @@ function editTransaction(button, transactionId) {
         showMessageModal("Invalid transaction ID!", true);
         return;
     }
-    fetch(`/get_transaction/${transactionId}/`, {
-        method: 'GET',
-        headers: { 'X-CSRFToken': getCookie('csrftoken') }
-    })
-    .then(response => {
-        console.log("Edit transaction response status:", response.status);
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log("Edit transaction response data:", data);
-        const editAmount = document.getElementById("editAmount");
-        const editCurrency = document.getElementById("editCurrency");
-        const editStatus = document.getElementById("editStatus");
-        const editCategory = document.getElementById("editCategory");
-        const editDate = document.getElementById("editDate");
-        const editDescription = document.getElementById("editDescription");
-        const editForm = document.getElementById("editForm");
-        if (!editAmount || !editCurrency || !editStatus || !editCategory || !editDate || !editDescription || !editForm) {
-            console.error("Edit form elements not found");
-            showMessageModal("Edit form elements not found!", true);
-            return;
-        }
-        editAmount.value = data.amount || 0;
-        editCurrency.value = data.currency || 'QAR';
-        editStatus.value = data.status || 'spent';
-        editCategory.value = data.category || '';
-        editDate.value = data.date || '';
-        editDescription.value = data.description || '';
-        editForm.dataset.rowIndex = transactionId;
-        openEditForm();
-    })
-    .catch(error => {
-        console.error('Error fetching transaction for edit:', error);
-        showMessageModal('Failed to fetch transaction for editing. Check console for details.', true);
-    });
+
+    // Try to find transaction in client-side array first
+    const transaction = transactions.find(t => t.id === parseInt(transactionId));
+    const startTime = performance.now(); // Measure performance
+
+    if (transaction) {
+        console.log("Transaction found in client-side array, opening form instantly:", transaction);
+        openEditFormWithData(transaction);
+    } else {
+        console.log("Transaction not found in client-side array, fetching from server...");
+        fetch(`/get_transaction/${transactionId}/`, {
+            method: 'GET',
+            headers: { 'X-CSRFToken': getCookie('csrftoken') }
+        })
+        .then(response => {
+            console.log("Edit transaction response status:", response.status);
+            if (!response.ok) {
+                throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            console.log("Edit transaction response data:", data);
+            const fetchedTransaction = data;
+            openEditFormWithData(fetchedTransaction);
+            // Update client-side array if new data differs
+            if (!transactions.some(t => t.id === fetchedTransaction.id)) {
+                transactions.push(fetchedTransaction);
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching transaction for edit:', error);
+            showMessageModal('Failed to fetch transaction for editing. Using default values. Check console for details.', true);
+            openEditFormWithData({ id: transactionId, amount: 0, currency: 'QAR', status: 'spent', category: '', date: '', description: '' });
+        });
+    }
+
+    const endTime = performance.now();
+    console.log(`Edit form opened in ${ (endTime - startTime).toFixed(2) }ms`);
 }
 
 function deleteTransaction(button, transactionId) {
@@ -524,25 +631,17 @@ function deleteTransaction(button, transactionId) {
     const confirmYesBtn = document.getElementById("confirmYes");
     const confirmNoBtn = document.getElementById("confirmNo");
     if (!confirmModal || !confirmYesBtn || !confirmNoBtn) {
-        console.error("Delete confirmation modal or buttons not found. Current DOM elements:", {
-            confirmModal: confirmModal,
-            confirmYesBtn: confirmYesBtn,
-            confirmNoBtn: confirmNoBtn
-        });
-        showMessageModal("Delete confirmation modal not found! Please ensure the HTML contains a modal with IDs: confirmDeleteModal, confirmYes, and confirmNo.", true);
+        console.error("Delete confirmation modal or buttons not found");
+        showMessageModal("Delete confirmation modal not found!", true);
         return;
     }
-
-    // Disable the button to prevent multiple clicks
-    button.disabled = true;
-    button.style.opacity = "0.6";
 
     confirmModal.style.display = "block";
     document.getElementById("overlay").style.display = "block";
     confirmModal.dataset.transactionId = transactionId;
 
     confirmYesBtn.onclick = function() {
-        // Show loading feedback (optional: add a loading spinner if styled)
+        // Show loading feedback (optimistic update)
         showMessageModal("Deleting transaction...", false);
 
         fetch(`/delete_transaction/${transactionId}/`, {
@@ -579,8 +678,6 @@ function deleteTransaction(button, transactionId) {
                 errorOkBtn.onclick = function() {
                     errorModal.style.display = "none";
                     document.getElementById("overlay").style.display = "none";
-                    button.disabled = false;
-                    button.style.opacity = "1";
                 };
             } else {
                 transactions = data.transactions || [];
@@ -589,21 +686,17 @@ function deleteTransaction(button, transactionId) {
                 showSummary();
                 updatePlanStatus();
                 updateVisualizations();
+                showMessageModal("Transaction deleted successfully.", false);
                 const successModal = document.getElementById("deleteSuccessModal");
                 const successOkBtn = document.getElementById("deleteSuccessOk");
                 if (!successModal || !successOkBtn) {
                     console.error("Delete success modal not found");
-                    showMessageModal("Transaction deleted successfully.", false);
-                    button.disabled = false;
-                    button.style.opacity = "1";
                     return;
                 }
                 successModal.style.display = "block";
                 successOkBtn.onclick = function() {
                     successModal.style.display = "none";
                     document.getElementById("overlay").style.display = "none";
-                    button.disabled = false;
-                    button.style.opacity = "1";
                 };
             }
         })
@@ -616,8 +709,6 @@ function deleteTransaction(button, transactionId) {
             if (!errorModal || !errorMessage || !errorOkBtn) {
                 console.error("Delete error modal not found");
                 showMessageModal(`Failed to delete transaction: ${error.message}`, true);
-                button.disabled = false;
-                button.style.opacity = "1";
                 return;
             }
             errorMessage.textContent = `Failed to delete transaction: ${error.message}`;
@@ -625,22 +716,18 @@ function deleteTransaction(button, transactionId) {
             errorOkBtn.onclick = function() {
                 errorModal.style.display = "none";
                 document.getElementById("overlay").style.display = "none";
-                button.disabled = false;
-                button.style.opacity = "1";
             };
         })
         .finally(() => {
             confirmModal.style.display = "none";
-            button.disabled = false;
-            button.style.opacity = "1";
+            confirmYesBtn.onclick = null;
+            confirmNoBtn.onclick = null;
         });
     };
 
     confirmNoBtn.onclick = function() {
         confirmModal.style.display = "none";
         document.getElementById("overlay").style.display = "none";
-        button.disabled = false;
-        button.style.opacity = "1";
         confirmYesBtn.onclick = null;
         confirmNoBtn.onclick = null;
     };
@@ -1180,7 +1267,7 @@ function addTransaction() {
 
     // Optimistic UI update: close form and show success message instantly
     closeTransactionForm();
-    showMessageModal("Transaction added successfully!", false); // Immediate feedback
+    showMessageModal("Adding transaction...", false); // Immediate feedback
 
     fetch('/add_transaction/', {
         method: 'POST',
@@ -1204,26 +1291,23 @@ function addTransaction() {
         console.log(`Initial fetch completed in ${(endTime - startTime).toFixed(2)}ms`);
 
         if (data.error) {
-            closeMessageModal(); // Clear success message on error
+            closeMessageModal(); // Clear loading message on error
             showMessageModal(`Error: ${data.error}`, true);
-            transactions = transactions.filter(t => t.id !== (data.transaction ? data.transaction.id : 0)); // Remove optimistic add
-            updateTable(transactions);
+            openTransactionForm(); // Reopen form on error
         } else if (data.transaction) {
             const newTransaction = data.transaction;
             transactions.unshift(newTransaction); // Add new transaction optimistically
             updateTable(transactions); // Update table instantly
+            showMessageModal("Transaction added successfully!", false);
         }
     })
     .catch(error => {
         console.error('Error adding transaction:', error);
         const endTime = performance.now();
         console.log(`Error handling completed in ${(endTime - startTime).toFixed(2)}ms`);
-        closeMessageModal(); // Clear success message on error
-        if (error.message.includes('HTTP error')) {
-            showMessageModal(`Failed to add transaction. Status: ${error.message}`, true);
-            transactions.pop(); // Remove last optimistic add
-            updateTable(transactions);
-        }
+        closeMessageModal(); // Clear loading message on error
+        showMessageModal(`Failed to add transaction. Status: ${error.message}`, true);
+        openTransactionForm(); // Reopen form on error
     })
     .finally(() => {
         // Background refresh to sync with server silently
@@ -1269,6 +1353,12 @@ function updateTransaction() {
     console.log("Sending update data for transaction ID:", transactionId, { amount, currency, status, category, date, description });
     console.log("CSRF Token:", getCookie('csrftoken'));
 
+    const startTime = performance.now(); // Measure performance
+
+    // Optimistic UI update: close form and show success message instantly
+    closeEditForm();
+    showMessageModal("Updating transaction...", false); // Immediate feedback
+
     fetch(`/update_transaction/${transactionId}/`, {
         method: 'POST',
         headers: {
@@ -1287,8 +1377,13 @@ function updateTransaction() {
     })
     .then(data => {
         console.log("Response data:", data);
+        const endTime = performance.now();
+        console.log(`Initial fetch completed in ${(endTime - startTime).toFixed(2)}ms`);
+
         if (data.error) {
+            closeMessageModal(); // Clear loading message on error
             showMessageModal(`Error: ${data.error}`, true);
+            openEditForm(); // Reopen form on error
         } else {
             const updatedTransaction = data.transaction || { id: parseInt(transactionId), amount, currency, status, category, date, description };
             transactions = transactions.map(t => t.id === parseInt(transactionId) ? updatedTransaction : t);
@@ -1297,25 +1392,16 @@ function updateTransaction() {
             showSummary();
             updatePlanStatus();
             updateVisualizations();
-            showMessageModal("Transaction updated successfully!");
-            closeEditForm();
+            showMessageModal("Transaction updated successfully!", false);
         }
     })
     .catch(error => {
         console.error('Error updating transaction:', error);
-        if (error.message.includes('HTTP error')) {
-            showMessageModal(`Failed to update transaction. Status: ${error.message}`, true);
-        } else {
-            const updatedTransaction = { id: parseInt(transactionId), amount, currency, status, category, date, description };
-            transactions = transactions.map(t => t.id === parseInt(transactionId) ? updatedTransaction : t);
-            updateTable(transactions);
-            updateTotals();
-            showSummary();
-            updatePlanStatus();
-            updateVisualizations();
-            showMessageModal("Transaction updated successfully (error recovery)!");
-            closeEditForm();
-        }
+        const endTime = performance.now();
+        console.log(`Error handling completed in ${(endTime - startTime).toFixed(2)}ms`);
+        closeMessageModal(); // Clear loading message on error
+        showMessageModal(`Failed to update transaction. Status: ${error.message}`, true);
+        openEditForm(); // Reopen form on error
     });
 }
 
@@ -1413,6 +1499,9 @@ function deleteTransaction(button, transactionId) {
     confirmModal.dataset.transactionId = transactionId;
 
     confirmYesBtn.onclick = function() {
+        // Show loading feedback (optimistic update)
+        showMessageModal("Deleting transaction...", false);
+
         fetch(`/delete_transaction/${transactionId}/`, {
             method: 'POST',
             headers: {
@@ -1432,6 +1521,7 @@ function deleteTransaction(button, transactionId) {
         })
         .then(data => {
             console.log("Delete transaction response data:", data);
+            closeMessageModal(); // Clear loading message
             if (data.error) {
                 const errorModal = document.getElementById("deleteErrorModal");
                 const errorMessage = document.getElementById("deleteErrorMessage");
@@ -1454,11 +1544,11 @@ function deleteTransaction(button, transactionId) {
                 showSummary();
                 updatePlanStatus();
                 updateVisualizations();
+                showMessageModal("Transaction deleted successfully.", false);
                 const successModal = document.getElementById("deleteSuccessModal");
                 const successOkBtn = document.getElementById("deleteSuccessOk");
                 if (!successModal || !successOkBtn) {
                     console.error("Delete success modal not found");
-                    showMessageModal("Transaction deleted successfully.", false);
                     return;
                 }
                 successModal.style.display = "block";
@@ -1470,6 +1560,7 @@ function deleteTransaction(button, transactionId) {
         })
         .catch(error => {
             console.error('Error deleting transaction:', error);
+            closeMessageModal(); // Clear loading message
             const errorModal = document.getElementById("deleteErrorModal");
             const errorMessage = document.getElementById("deleteErrorMessage");
             const errorOkBtn = document.getElementById("deleteErrorOk");
@@ -1794,99 +1885,4 @@ function deletePlan(planId) {
             alert("Failed to delete plan. Check console for details.");
         });
     }
-}
-
-// Plan-related functions (only for plans page)
-function deductFromPlans(category, amount) {
-    plans.forEach(plan => {
-        const today = new Date().toISOString().split('T')[0];
-        if (plan.status === "Active" && today >= plan.from_date && today <= plan.to_date) {
-            if (plan.categories.includes(category) || plan.categories.includes("all")) {
-                plan.left_money = Math.max(0, plan.left_money - amount);
-                updatePlanTable();
-            }
-        }
-    });
-}
-
-function addToPlans(category, amount) {
-    plans.forEach(plan => {
-        if (plan.categories.includes(category) || plan.categories.includes("all")) {
-            plan.left_money += amount;
-            updatePlanTable();
-        }
-    });
-}
-
-function addCategory(event) {
-    // Prevent form submission if called from a form event
-    if (event) event.preventDefault();
-
-    console.log("Add Category clicked");
-    const categoryName = document.getElementById("categoryName").value; // Adjust ID based on your form
-
-    if (!categoryName || categoryName.trim() === "") {
-        showMessageModal("Please enter a category name!", true);
-        return;
-    }
-
-    console.log("Sending category data:", { name: categoryName });
-    console.log("CSRF Token:", getCookie('csrftoken'));
-
-    const startTime = performance.now(); // Measure performance
-
-    // Optimistic UI update: close form and show success message instantly
-    closeCategoryForm();
-    showMessageModal("Category added successfully!", false); // Immediate feedback
-
-    fetch('/add_category/', { // Adjust endpoint based on your URL
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'X-CSRFToken': getCookie('csrftoken'),
-            'X-Requested-With': 'XMLHttpRequest'
-        },
-        body: JSON.stringify({ name: categoryName })
-    })
-    .then(response => {
-        console.log("Fetch response status:", response.status);
-        if (!response.ok) {
-            throw new Error(`HTTP error! Status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        console.log("Response data:", data);
-        const endTime = performance.now();
-        console.log(`Initial fetch completed in ${(endTime - startTime).toFixed(2)}ms`);
-
-        if (data.error) {
-            closeMessageModal(); // Clear success message on error
-            showMessageModal(`Error: ${data.error}`, true);
-            // Optionally revert UI if needed (e.g., reopen modal)
-        } else if (data.category) {
-            categories.unshift(data.category); // Add new category optimistically if tracked
-            updateCategoryTable(categories); // Update table instantly if applicable
-        }
-    })
-    .catch(error => {
-        console.error('Error adding category:', error);
-        const endTime = performance.now();
-        console.log(`Error handling completed in ${(endTime - startTime).toFixed(2)}ms`);
-        closeMessageModal(); // Clear success message on error
-        showMessageModal(`Failed to add category. Status: ${error.message}`, true);
-        // Optionally revert UI if needed
-    })
-    .finally(() => {
-        // Background refresh to sync with server silently
-        setTimeout(() => {
-            fetchCategories() // Adjust endpoint based on your URL
-                .then(() => {
-                    updateCategoryTable(categories); // Update table if applicable
-                })
-                .catch(err => {
-                    console.error('Error fetching updated categories:', err);
-                });
-        }, 0); // Non-blocking background task
-    });
 }
