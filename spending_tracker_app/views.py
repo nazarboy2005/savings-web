@@ -1,3 +1,5 @@
+import os
+from django.contrib.auth import update_session_auth_hash
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
@@ -29,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 # Exchange rate API configuration (using exchangerate-api.com with your valid API key)
 EXCHANGE_RATE_API_URL = "https://v6.exchangerate-api.com/v6"
-API_ACCESS_KEY = "b93303b5754704413a760a41"  # Your valid API key from exchangerate-api.com
+API_ACCESS_KEY = os.getenv('API_ACCESS_KEY_exchange')  # Your valid API key from exchangerate-api.com
 
 
 def test_network_connectivity():
@@ -797,9 +799,8 @@ def set_currency(request):
         if preferred_currency:
             request.session['preferred_currency'] = preferred_currency
             return redirect('spending_tracker_app:index')
-    return render(request, 'set_currency.html')
+    return render(request, 'profile.html')
 
-from django.contrib.auth import update_session_auth_hash
 
 @login_required
 def change_password(request):
