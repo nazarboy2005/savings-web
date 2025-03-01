@@ -133,8 +133,7 @@ p {
     background-color: #00ffcc;
 }
 
-/* ... (Keep all existing CSS unchanged until table section) ... */
-
+/* Table styling */
 .table-wrapper {
     width: 95%;
     margin: 0 auto;
@@ -206,8 +205,6 @@ td {
     color: #660000;
 }
 
-/* ... (Keep all remaining CSS unchanged) ... */
-
 .totals, .summary {
     margin: 10px auto;
     padding: 15px;
@@ -241,6 +238,7 @@ td {
     color: #a0a0b0;
 }
 
+/* Modal styling (updated to be wider and left-aligned) */
 .modal {
     display: none;
     position: fixed;
@@ -252,16 +250,20 @@ td {
     border-radius: 5px;
     box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
     z-index: 1000;
+    width: 400px; /* Increased to 400px for a wider modal */
+    text-align: left; /* Align text to the left as requested */
 }
 
 .modal h3 {
     color: #00d4b4;
     margin-top: 0;
+    text-align: left; /* Ensure title is left-aligned */
 }
 
 .modal label {
     color: #a0a0b0;
     margin: 10px 0 5px;
+    text-align: left; /* Left-align labels */
 }
 
 .modal input, .modal select, .modal textarea {
@@ -272,6 +274,7 @@ td {
     border-radius: 5px;
     background-color: #3a4060;
     color: #fff;
+    text-align: left; /* Left-align text in inputs */
 }
 
 .modal button {
@@ -282,12 +285,23 @@ td {
     border-radius: 5px;
     cursor: pointer;
     margin-right: 10px;
+    text-align: center; /* Center button text for readability */
 }
 
 .modal button:hover {
     background-color: #00ffcc;
 }
 
+/* Specific styling for success and error modals */
+.success-modal {
+    border: 2px solid #00ffcc;
+}
+
+.error-modal {
+    border: 2px solid #ff4444;
+}
+
+/* Overlay style */
 .overlay {
     display: none;
     position: fixed;
@@ -411,46 +425,6 @@ td {
 #budgetStatus.over-budget {
     color: #ff6666;
 }
-.modal {
-    display: none;
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: #1e2336;
-    padding: 20px;
-    border-radius: 5px;
-    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
-    z-index: 1000;
-    width: 300px;
-    text-align: center;
-}
-
-.message-content {
-    color: #fff;
-}
-
-.success-modal {
-    border: 2px solid #00ffcc;
-}
-
-.error-modal {
-    border: 2px solid #ff4444;
-}
-
-.modal button {
-    padding: 10px;
-    background-color: #00d4b4;
-    color: #fff;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    margin-top: 10px;
-}
-
-.modal button:hover {
-    background-color: #00ffcc;
-}
 
 .categories-section {
     margin: 20px auto;
@@ -479,4 +453,31 @@ td {
 #categoryTable td {
     padding: 10px;
     border-bottom: 1px solid #3a4060;
-    border-bottom: 1px solid #3a4060;
+}
+
+/* Style for buttons in the Actions column of the table */
+table td button {
+    padding: 5px 10px;
+    margin-right: 5px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer; /* Default cursor as pointer for interactivity */
+}
+
+table td button:hover {
+    cursor: pointer; /* Ensure cursor remains pointer on hover */
+}
+
+/* Specific styling for Edit and Delete buttons to match your image */
+table td button[onclick*="editTransaction"],
+table td button[onclick*="deleteTransaction"] {
+    background-color: #ff4444; /* Red background as shown in your image */
+    color: white;
+    cursor: pointer; /* Default cursor as pointer */
+}
+
+table td button[onclick*="editTransaction"]:hover,
+table td button[onclick*="deleteTransaction"]:hover {
+    background-color: #cc3333; /* Darker red on hover */
+    cursor: pointer; /* Ensure cursor remains pointer on hover */
+}

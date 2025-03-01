@@ -430,6 +430,10 @@ function deleteCategory() {
 
     const startTime = performance.now(); // Measure performance
 
+    // Optimistic UI update: close modal and show loading message instantly
+    closeConfirmDeleteCategoryModal();
+    showMessageModal("Deleting category...", false); // Immediate feedback
+
     fetch(`/delete_category/${categoryId}/`, {
         method: 'POST',
         headers: {
@@ -450,25 +454,29 @@ function deleteCategory() {
         console.log(`Category deleted in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
         console.log("Delete category response data:", data);
         if (data.error) {
+            closeMessageModal(); // Clear loading message on error
             showMessageModal(`Error: ${data.error}`, true);
+            confirmDeleteCategory(categoryId); // Reopen confirmation on error
         } else {
             categories = data.categories || [];
             updateCategoryTable(categories);
             showMessageModal("Category and associated spendings deleted successfully!", false);
-            closeConfirmDeleteCategoryModal();
         }
     })
     .catch(error => {
         console.error('Error deleting category:', error);
         const endTime = performance.now();
         console.log(`Error handling completed in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
-        showMessageModal('Failed to delete category. Check console for details.', true);
+        closeMessageModal(); // Clear loading message on error
+        showMessageModal(`Failed to delete category. Status: ${error.message}. Check console for details.`, true);
+        confirmDeleteCategory(categoryId); // Reopen confirmation on error
     })
     .finally(() => {
         // Hide loading indicator when done
         if (loadingIndicator) loadingIndicator.style.display = "none";
     });
 }
+
 
 function updateCategory() {
     const categoryId = document.getElementById("editCategoryId").value;
@@ -487,6 +495,10 @@ function updateCategory() {
     if (loadingIndicator) loadingIndicator.style.display = "block";
 
     const startTime = performance.now(); // Measure performance
+
+    // Optimistic UI update: close form and show loading message instantly
+    closeEditCategoryForm();
+    showMessageModal("Updating category...", false); // Immediate feedback
 
     fetch('/update_category/', {
         method: 'POST',
@@ -516,11 +528,13 @@ function updateCategory() {
         console.log(`Category updated in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
         console.log("Update category response data:", data);
         if (data.error) {
+            closeMessageModal(); // Clear loading message on error
             if (data.error.toLowerCase().includes('already') || data.error.toLowerCase().includes('exists') || data.error.toLowerCase().includes('in use')) {
                 showMessageModal(`Oops! The category "${categoryName}" already exists. Please choose a different name.`, true);
             } else {
                 showMessageModal(`Sorry, we couldn’t update the category: ${data.error}. Please try again!`, true);
             }
+            editCategory(categoryId, categoryName); // Reopen edit form on error
         } else {
             categories = data.categories || [];
             updateCategoryTable(categories);
@@ -528,14 +542,13 @@ function updateCategory() {
             populateCategoryDropdown("editCategory");
             populateFilterCategoryDropdown();
             showMessageModal("Great! Your category has been updated successfully.", false);
-            closeEditCategoryForm();
         }
     })
     .catch(error => {
         console.error('Error updating category:', error.message);
         const endTime = performance.now();
         console.log(`Error handling completed in ${((endTime - startTime) / 1000).toFixed(2)} seconds`);
-        closeEditCategoryForm(); // Close the form on error
+        closeMessageModal(); // Clear loading message on error
         let errorMessage = error.message;
         if (errorMessage.includes('Validation error') || errorMessage.includes('check your input')) {
             showMessageModal("Please double-check the category name and try again!", true);
@@ -546,6 +559,7 @@ function updateCategory() {
         } else {
             showMessageModal("Sorry, something unexpected happened. Please try again later!", true);
         }
+        editCategory(categoryId, categoryName); // Reopen edit form on error
     })
     .finally(() => {
         // Hide loading indicator when done
