@@ -2,15 +2,18 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import login, authenticate, logout
+from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError, transaction
 from django.http import JsonResponse, HttpResponse
 from .models import Transaction, Category, Plan
+from django.core.exceptions import ObjectDoesNotExist, ValidationError
 import openpyxl
 from django.db.models import Q, Sum, Count
 from django.core.serializers.json import DjangoJSONEncoder
 import json
 import datetime
 import logging
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from io import BytesIO
 from django.http import HttpResponse
 from reportlab.lib.pagesizes import LETTER
@@ -132,10 +135,11 @@ def signup(request):
         if form.is_valid():
             user = form.save()
             login(request, user)
-            return redirect('spending_tracker_app:index')
+            return redirect('spending_tracker_app:set_currency')  # Changed from 'index'
     else:
         form = UserCreationForm()
     return render(request, 'signup.html', {'form': form})
+
 
 
 def logout_view(request):
@@ -243,9 +247,8 @@ def charts(request):
 def profile(request):
     transactions = Transaction.objects.filter(user=request.user)
     plans = Plan.objects.filter(user=request.user)
-    display_currency = 'QAR'  # Default to QAR, or fetch from request if needed
+    display_currency = request.GET.get('display_currency', request.session.get('preferred_currency', 'QAR'))
 
-    # Convert totals to display currency
     total_spent = Decimal('0')
     total_earned = Decimal('0')
     for t in transactions:
@@ -258,6 +261,11 @@ def profile(request):
     ai_recommendation = "You are overspending if total spent exceeds 70% of total earned."
     if total_spent > (Decimal('0.7') * total_earned) and total_earned > Decimal('0'):
         ai_recommendation = "Warning: You are overspending! Consider reducing expenses or revising your plans."
+
+    # Store in session for error handling in change_password
+    request.session['total_earned'] = float(total_earned)
+    request.session['total_spent'] = float(total_spent)
+    request.session['ai_recommendation'] = ai_recommendation
 
     context = {
         'total_spent': float(total_spent),
@@ -273,38 +281,21 @@ def profile(request):
 def add_transaction(request):
     if request.method == "POST" and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
-            if not request:
-                logger.error("Request object is not defined in add_transaction")
-                return JsonResponse({'error': 'Internal server error: Request object missing'}, status=500)
-
             data = json.loads(request.body)
             logger.debug(f"Add transaction data: {data}")
 
-            # Validate amount
-            amount_str = str(data.get('amount', 0))
-            try:
-                amount = Decimal(amount_str)
-                if amount < 0:
-                    return JsonResponse({'error': 'Amount must be non-negative'}, status=400)
-            except (ValueError, InvalidOperation):
-                return JsonResponse({'error': 'Field "amount" expected a number'}, status=400)
+            amount = Decimal(str(data.get('amount', 0)))
+            if amount < 0:
+                return JsonResponse({'error': 'Amount must be non-negative'}, status=400)
 
-            # Handle category
             category_name = data.get('category', '')
             if not category_name or not isinstance(category_name, str):
                 return JsonResponse({'error': 'Category name is required and must be a string'}, status=400)
 
             category, created = Category.objects.get_or_create(name=category_name, user=request.user)
 
-            # Handle date
-            date_str = data.get('date', datetime.date.today().strftime('%Y-%m-%d'))
-            try:
-                date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-            except ValueError:
-                logger.error(f"Invalid date format for transaction: {date_str}")
-                date = datetime.date.today()
+            date = datetime.datetime.strptime(data.get('date', datetime.date.today().strftime('%Y-%m-%d')), '%Y-%m-%d').date()
 
-            # Create transaction
             transaction = Transaction.objects.create(
                 user=request.user,
                 date=date,
@@ -315,20 +306,12 @@ def add_transaction(request):
                 description=data.get('description', '')
             )
 
-            # Handle plan deduction (simplified for speed)
             if transaction.status == 'spent':
                 deduct_from_plans(request.user, category.name, float(amount))
 
-            # Return only the new transaction for immediate response
             display_currency = request.GET.get('display_currency', 'QAR')
-            if display_currency == 'Auto':
-                converted_amount = transaction.amount
-                currency = transaction.currency
-                exchange_rate = Decimal('1')
-            else:
-                converted_amount = convert_currency(transaction.amount, transaction.currency, display_currency)
-                currency = display_currency
-                exchange_rate = get_exchange_rate(transaction.currency, display_currency)
+            converted_amount = convert_currency(transaction.amount, transaction.currency, display_currency)
+            currency = display_currency
 
             return JsonResponse({
                 'transaction': {
@@ -338,76 +321,52 @@ def add_transaction(request):
                     'category__name': category.name,
                     'amount': float(converted_amount),
                     'currency': currency,
-                    'description': transaction.description,
-                    'exchange_rate': float(exchange_rate) if display_currency != 'Auto' else None,
-                    'original_currency': transaction.currency,
-                    'original_amount': float(transaction.amount),
+                    'description': transaction.description
                 }
             }, encoder=DjangoJSONEncoder, safe=False)
 
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON data: {str(e)}")
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
         except Exception as e:
             logger.error(f"Error in add_transaction: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 @login_required
 def update_transaction(request, transaction_id):
     if request.method == "POST" and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
         try:
             data = json.loads(request.body)
-            logger.debug(f"Update transaction data: {data}")
+            logger.debug(f"Update transaction data for ID {transaction_id}: {data}")
             transaction = get_object_or_404(Transaction, id=transaction_id, user=request.user)
-            old_amount = float(transaction.amount)
-            old_category = transaction.category.name if transaction.category else ''
-            old_status = transaction.status
 
-            # Update transaction fields
-            # Handle date as string and convert to date object
-            date_str = data.get('date', transaction.date.strftime('%Y-%m-%d'))  # Default to current date if not provided
-            try:
-                date = datetime.datetime.strptime(date_str, '%Y-%m-%d').date()
-            except ValueError:
-                logger.error(f"Invalid date format for transaction {transaction_id}: {date_str}")
-                date = transaction.date  # Fallback to existing date
+            amount = Decimal(str(data.get('amount', str(transaction.amount))))
+            if amount < 0:
+                return JsonResponse({'error': 'Amount must be non-negative'}, status=400)
 
-            transaction.date = date
-            transaction.status = data.get('status', transaction.status)
             category_name = data.get('category', transaction.category.name if transaction.category else '')
             if not category_name or not isinstance(category_name, str):
                 return JsonResponse({'error': 'Category name is required and must be a string'}, status=400)
-            category, created = Category.objects.get_or_create(name=category_name, user=request.user)
-            transaction.category = category
 
-            amount_str = str(data.get('amount', str(transaction.amount)))
-            try:
-                amount = Decimal(amount_str)
-                if amount < 0:
-                    return JsonResponse({'error': 'Amount must be non-negative'}, status=400)
-            except (ValueError, InvalidOperation):
-                return JsonResponse({'error': 'Field "amount" expected a number'}, status=400)
+            category, created = Category.objects.get_or_create(name=category_name, user=request.user)
+
+            date = datetime.datetime.strptime(data.get('date', transaction.date.strftime('%Y-%m-%d')), '%Y-%m-%d').date()
+
+            transaction.date = date
+            transaction.status = data.get('status', transaction.status)
+            transaction.category = category
             transaction.amount = amount
             transaction.currency = data.get('currency', transaction.currency)
             transaction.description = data.get('description', transaction.description)
             transaction.save()
 
-            # Handle plan updates
             if transaction.status == 'spent':
                 deduct_from_plans(request.user, category.name, float(amount))
-                if old_status == 'earned' or old_category != category.name or old_amount != float(amount):
-                    add_to_plans(request.user, old_category, old_amount)
-            elif transaction.status == 'earned' and old_status == 'spent':
-                add_to_plans(request.user, old_category, old_amount)
 
-            # Return only the updated transaction for immediate response
             display_currency = request.GET.get('display_currency', 'QAR')
-            if display_currency == 'Auto':
-                converted_amount = transaction.amount
-                currency = transaction.currency
-                exchange_rate = Decimal('1')
-            else:
-                converted_amount = convert_currency(transaction.amount, transaction.currency, display_currency)
-                currency = display_currency
-                exchange_rate = get_exchange_rate(transaction.currency, display_currency)
+            converted_amount = convert_currency(transaction.amount, transaction.currency, display_currency)
+            currency = display_currency
 
             return JsonResponse({
                 'transaction': {
@@ -417,17 +376,18 @@ def update_transaction(request, transaction_id):
                     'category__name': category.name,
                     'amount': float(converted_amount),
                     'currency': currency,
-                    'description': transaction.description,
-                    'exchange_rate': float(exchange_rate) if display_currency != 'Auto' else None,
-                    'original_currency': transaction.currency,
-                    'original_amount': float(transaction.amount),
+                    'description': transaction.description
                 }
             }, encoder=DjangoJSONEncoder, safe=False)
 
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON data: {str(e)}")
+            return JsonResponse({'error': 'Invalid JSON data'}, status=400)
         except Exception as e:
             logger.error(f"Error in update_transaction for ID {transaction_id}: {str(e)}")
             return JsonResponse({'error': str(e)}, status=500)
-    return JsonResponse({'error': 'Invalid request method'}, status=400)
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
+
 
 @login_required
 def get_transaction(request, transaction_id):
@@ -680,6 +640,12 @@ def generate_report(request):
             return response
     return JsonResponse({'error': 'Invalid request method'}, status=400)
 
+@login_required
+def categories(request):
+    categories = Category.objects.filter(user=request.user)
+    context = {'categories': categories}
+    return render(request, 'categories.html', context)
+
 
 @login_required
 def add_category(request):
@@ -713,6 +679,74 @@ def add_category(request):
 def get_categories(request):
     categories = Category.objects.filter(user=request.user).values('id', 'name')
     return JsonResponse({'categories': list(categories)}, encoder=DjangoJSONEncoder, safe=False)
+
+
+@login_required
+def update_category(request):
+    if request.method == "POST" and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            data = json.loads(request.body)
+            logger.debug(f"Update category data: {data}")
+            category_id = data.get('category_id')
+            new_name = data.get('name')
+
+            if not category_id or not new_name or not isinstance(new_name, str):
+                return JsonResponse({'error': 'Please provide a category ID and a valid name'}, status=400)
+
+            # Validate new_name (e.g., remove excessive whitespace and check length)
+            new_name = new_name.strip()
+            if not new_name or len(new_name) > 100:  # Adjust max length based on your model
+                return JsonResponse({'error': 'Category name cannot be empty or too long (max 100 characters)'},
+                                    status=400)
+
+            category = get_object_or_404(Category, id=category_id, user=request.user)
+
+            # Check for duplicate category name (case-insensitive) excluding the current category
+            if Category.objects.filter(user=request.user, name__iexact=new_name).exclude(id=category_id).exists():
+                return JsonResponse(
+                    {'error': f'This category name "{new_name}" is already in use, please choose another.'}, status=400)
+
+            # Use transaction to ensure atomicity
+            with transaction.atomic():
+                category.name = new_name
+                category.save()
+
+            # Fetch updated list of categories for the user
+            categories = Category.objects.filter(user=request.user).values('id', 'name')
+            return JsonResponse({'categories': list(categories)}, encoder=DjangoJSONEncoder, safe=False)
+
+        except json.JSONDecodeError as e:
+            logger.error(f"Invalid JSON data: {str(e)}")
+            return JsonResponse({'error': 'The data sent was invalid, please try again'}, status=400)
+        except ObjectDoesNotExist:
+            logger.error(f"Category with ID {category_id} not found for user {request.user}")
+            return JsonResponse({'error': 'The category you tried to edit was not found'}, status=404)
+        except IntegrityError as e:
+            logger.error(f"Integrity error updating category: {str(e)}")
+            return JsonResponse({'error': 'This category name is already in use, please choose a different name'},
+                                status=400)
+        except ValidationError as e:
+            logger.error(f"Validation error updating category: {str(e)}")
+            return JsonResponse({'error': f'The category name is not valid, please use a different name'}, status=400)
+        except Exception as e:
+            logger.error(f"Unexpected error in update_category: {str(e)}", exc_info=True)
+            return JsonResponse({'error': 'Something went wrong while updating the category, please try again later'},
+                                status=500)
+    return JsonResponse({'error': 'Invalid request method, please use the correct method'}, status=405)
+@login_required
+def delete_category(request, category_id):
+    if request.method == "POST" and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            category = get_object_or_404(Category, id=category_id, user=request.user)
+            # Delete associated transactions
+            Transaction.objects.filter(user=request.user, category=category).delete()
+            category.delete()
+            categories = Category.objects.filter(user=request.user).values('id', 'name')
+            return JsonResponse({'categories': list(categories)}, encoder=DjangoJSONEncoder, safe=False)
+        except Exception as e:
+            logger.error(f"Error in delete_category for ID {category_id}: {str(e)}")
+            return JsonResponse({'error': str(e)}, status=500)
+    return JsonResponse({'error': 'Invalid request method'}, status=405)
 
 
 @login_required
@@ -754,3 +788,55 @@ def add_to_plans(user, category_name, amount):
                 'all' in [c.name.lower() for c in plan.categories.all()]:
             plan.left_money += Decimal(str(amount))
             plan.save()
+
+
+@login_required
+def set_currency(request):
+    if request.method == 'POST':
+        preferred_currency = request.POST.get('preferred_currency')
+        if preferred_currency:
+            request.session['preferred_currency'] = preferred_currency
+            return redirect('spending_tracker_app:index')
+    return render(request, 'set_currency.html')
+
+from django.contrib.auth import update_session_auth_hash
+
+@login_required
+def change_password(request):
+    if request.method == 'POST':
+        old_password = request.POST.get('old_password')
+        new_password = request.POST.get('new_password')
+        if request.user.check_password(old_password):
+            request.user.set_password(new_password)
+            request.user.save()
+            update_session_auth_hash(request, request.user)  # Keep user logged in
+            return redirect('spending_tracker_app:profile')
+        else:
+            return render(request, 'profile.html', {
+                'total_earned': request.session.get('total_earned', 0),
+                'total_spent': request.session.get('total_spent', 0),
+                'ai_recommendation': request.session.get('ai_recommendation', ''),
+                'error': 'Old password is incorrect'
+            })
+    return redirect('spending_tracker_app:profile')
+
+@login_required
+def update_currency(request):
+    if request.method == 'POST':
+        preferred_currency = request.POST.get('preferred_currency')
+        if preferred_currency:
+            request.session['preferred_currency'] = preferred_currency
+        return redirect('spending_tracker_app:profile')
+    return redirect('spending_tracker_app:profile')
+
+@login_required
+def clear_records(request):
+    if request.method == 'POST' and request.headers.get('X-Requested-With') == 'XMLHttpRequest':
+        try:
+            Transaction.objects.filter(user=request.user).delete()
+            Category.objects.filter(user=request.user).delete()
+            Plan.objects.filter(user=request.user).delete()
+            return JsonResponse({'success': True})
+        except Exception as e:
+            return JsonResponse({'success': False, 'error': str(e)}, status=500)
+    return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=400)

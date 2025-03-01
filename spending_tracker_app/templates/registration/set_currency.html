@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% block title %}Set Currency Preference - Spending Tracker{% endblock %}
+{% block content %}
+<div class="login-container">
+    <h2>Set Your Preferred Currency</h2>
+    <form method="post">
+        {% csrf_token %}
+        <label for="preferred_currency">Choose your preferred currency:</label>
+        <select name="preferred_currency" id="preferred_currency" required>
+            <option value="EUR">EUR (Euro)</option>
+            <option value="GBP">GBP (Pound Sterling)</option>
+            <option value="JPY">JPY (Japanese Yen)</option>
+            <!-- Add more options as needed -->
+        </select>
+        <button type="submit">Save and Continue</button>
+    </form>
+</div>
+{% endblock %}

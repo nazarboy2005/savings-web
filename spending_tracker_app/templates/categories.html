@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Manage Categories - Spending Tracker{% endblock %}
+{% block content %}
+<h1>Manage Categories</h1>
+<p>Add, edit, or delete your spending categories here.</p>
+
+<div class="action-buttons">
+    <button class="add-category-btn" style="background-color: purple;" onclick="openCategoryForm()">Add Category</button>
+</div>
+
+<table id="categoryTable">
+    <thead>
+    <tr style="background-color: teal;">
+        <th>Name</th>
+        <th>Actions</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for cat in categories %}
+    <tr>
+        <td>{{ cat.name }}</td>
+        <td>
+            <button onclick="editCategory({{ cat.id }}, '{{ cat.name }}')" style="background-color: #ff4444;">Edit</button>
+            <button onclick="confirmDeleteCategory({{ cat.id }})" style="background-color: #ff4444;">Delete</button>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<!-- Modals -->
+<div class="modal" id="categoryModal">
+    <h3>Add Category</h3>
+    <form id="categoryForm" method="post" action="{% url 'spending_tracker_app:add_category' %}">
+        {% csrf_token %}
+        <label for="newCategory">Category Name:</label>
+        <input type="text" id="newCategory" name="name" required placeholder="Enter category...">
+        <button type="submit" style="background-color: #9b59b6;">Add</button>
+        <button type="button" onclick="closeCategoryForm()" style="background-color: #7f8c8d;">Cancel</button>
+    </form>
+</div>
+
+<div class="modal" id="editCategoryModal">
+    <h3>Edit Category</h3>
+    <form id="editCategoryForm">
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+        <input type="hidden" id="editCategoryId" name="category_id">
+        <label for="editCategoryName">Category Name:</label>
+        <input type="text" id="editCategoryName" name="category_name" required>
+        <button type="button" onclick="updateCategory()" style="background-color: #00ff99;">Save</button>
+        <button type="button" onclick="closeEditCategoryForm()" style="background-color: #7f8c8d;">Cancel</button>
+    </form>
+</div>
+
+<div class="modal" id="confirmDeleteCategoryModal">
+    <h3>Confirm Delete</h3>
+    <p>Deleting this category will also delete all associated spendings. Are you sure?</p>
+    <input type="hidden" id="deleteCategoryId">
+    <button type="button" onclick="deleteCategory()" style="background-color: #ff4444;">Continue</button>
+    <button type="button" onclick="closeConfirmDeleteCategoryModal()" style="background-color: #7f8c8d;">Cancel</button>
+</div>
+
+<div class="modal" id="messageModal">
+    <div class="message-content">
+        <p id="messageText"></p>
+        <button type="button" onclick="closeMessageModal()" style="background-color: #00d4b4;">OK</button>
+    </div>
+</div>
+
+<div class="overlay" id="overlay"></div>
+
+<script src="{% static 'js/script.js' %}"></script>
+{% endblock %}

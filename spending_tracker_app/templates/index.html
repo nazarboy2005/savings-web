@@ -6,11 +6,8 @@
 <p>Track your daily spendings and earnings effortlessly.</p>
 
 <div class="action-buttons">
-    <button class="add-transaction-btn" style="background-color: teal;" onclick="openTransactionForm()">Add
-        Transaction
-    </button>
-    <button class="add-category-btn" style="background-color: purple;" onclick="openCategoryForm()">Add Category
-    </button>
+    <button class="add-transaction-btn" style="background-color: teal;" onclick="openTransactionForm()">Add Transaction</button>
+    <button class="add-category-btn" type="button">Add Category</button>
     <button class="get-report-btn" style="background-color: orange;" onclick="openReportModal()">Get Report</button>
 </div>
 
@@ -37,13 +34,12 @@
         <select name="display_currency" id="displayCurrency">
             <option value="QAR" {% if request.GET.display_currency == 'QAR' %}selected{% endif %}>QAR</option>
             <option value="USD" {% if request.GET.display_currency == 'USD' %}selected{% endif %}>USD</option>
-            <option value="EUR" {% if request.GET.display_currency == 'EUR' %}selected{% endif %}>EUR</option>
+            <option value="{{ request.session.preferred_currency|default:'EUR' }}" {% if request.GET.display_currency == request.session.preferred_currency %}selected{% endif %}>{{ request.session.preferred_currency|default:'EUR' }}</option>
         </select>
-        <button type="button" id="apply-filters" style="background-color: teal;" onclick="applyFilters()">Apply
-            Filters
-        </button>
+        <button type="button" id="apply-filters" style="background-color: teal;" onclick="applyFilters()">Apply Filters</button>
     </form>
 </div>
+
 <table id="expenseTable">
     <thead>
     <tr style="background-color: teal;">
@@ -66,10 +62,8 @@
         <td>{{ transaction.currency }}</td>
         <td>{{ transaction.description }}</td>
         <td>
-            <button onclick="editTransaction(this, {{ transaction.id }})" style="background-color: #ff4444;">Edit
-            </button>
-            <button onclick="deleteTransaction(this, {{ transaction.id }})" style="background-color: #ff4444;">Delete
-            </button>
+            <button onclick="editTransaction(this, {{ transaction.id }})" style="background-color: #ff4444;">Edit</button>
+            <button onclick="deleteTransaction(this, {{ transaction.id }})" style="background-color: #ff4444;">Delete</button>
         </td>
     </tr>
     {% endfor %}
@@ -82,7 +76,7 @@
     <p id="totalSpentFromHome" style="display: none;">0</p>
 </div>
 <div class="summary" id="summary"></div>
-<div id="budgetStatus" class="budget-status"></div> <!-- Add this for plan status update -->
+<div id="budgetStatus" class="budget-status"></div>
 
 <div class="visualization">
     <h2>Visualize Your Spending</h2>
@@ -103,7 +97,7 @@
         <select id="currency" name="currency" required>
             <option value="QAR">QAR</option>
             <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
+            <option value="{{ request.session.preferred_currency|default:'EUR' }}" {% if request.session.preferred_currency %}selected{% endif %}>{{ request.session.preferred_currency|default:'EUR' }}</option>
         </select>
         <label for="status">Spent/Earned:</label>
         <select id="status" name="status" required>
@@ -126,33 +120,6 @@
         <button type="button" onclick="closeTransactionForm()" style="background-color: #7f8c8d;">Cancel</button>
     </form>
 </div>
-<!-- Confirmation Modal for Delete -->
-<div id="confirmDeleteModal" class="modal"
-     style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 1px solid #ccc; z-index: 1000;">
-    <p>Are you sure you want to delete this transaction?</p>
-    <button id="confirmYes" style="background-color: #ff4444; color: white; padding: 5px 10px; margin-right: 10px;">
-        Yes
-    </button>
-    <button id="confirmNo" style="background-color: #666; color: white; padding: 5px 10px;">No</button>
-</div>
-
-<!-- Success Modal for Delete -->
-<div id="deleteSuccessModal" class="modal"
-     style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 1px solid #ccc; z-index: 1000;">
-    <p>Transaction deleted successfully.</p>
-    <button id="deleteSuccessOk" style="background-color: #00ffcc; padding: 5px 10px;">OK</button>
-</div>
-
-<!-- Error Modal for Delete -->
-<div id="deleteErrorModal" class="modal"
-     style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 1px solid #ccc; z-index: 1000;">
-    <p id="deleteErrorMessage">An error occurred while deleting the transaction.</p>
-    <button id="deleteErrorOk" style="background-color: #ff4444; color: white; padding: 5px 10px;">OK</button>
-</div>
-
-<!-- Overlay for Modals -->
-<div id="overlay"
-     style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 999;"></div>
 
 <div class="modal" id="editModal">
     <h3>Edit Transaction</h3>
@@ -164,7 +131,7 @@
         <select id="editCurrency" name="currency" required>
             <option value="QAR">QAR</option>
             <option value="USD">USD</option>
-            <option value="EUR">EUR</option>
+            <option value="{{ request.session.preferred_currency|default:'EUR' }}" {% if request.session.preferred_currency %}selected{% endif %}>{{ request.session.preferred_currency|default:'EUR' }}</option>
         </select>
         <label for="editStatus">Spent/Earned:</label>
         <select id="editStatus" name="status" required>
@@ -199,6 +166,18 @@
     </form>
 </div>
 
+<div class="modal" id="editCategoryModal">
+    <h3>Edit Category</h3>
+    <form id="editCategoryForm">
+        <input type="hidden" name="csrfmiddlewaretoken" value="{{ csrf_token }}">
+        <input type="hidden" id="editCategoryId" name="category_id">
+        <label for="editCategoryName">Category Name:</label>
+        <input type="text" id="editCategoryName" name="category_name" required>
+        <button type="button" onclick="updateCategory()" style="background-color: #00ff99;">Save</button>
+        <button type="button" onclick="closeEditCategoryForm()" style="background-color: #7f8c8d;">Cancel</button>
+    </form>
+</div>
+
 <div class="modal" id="reportModal">
     <h3>Generate Report</h3>
     <form id="reportForm" method="post" action="{% url 'spending_tracker_app:generate_report' %}">
@@ -210,16 +189,27 @@
             <option value="excel">Excel</option>
             <option value="pdf">PDF</option>
         </select>
-        <!-- Hidden fields to pass current filter parameters -->
         <input type="hidden" name="start_date" id="reportStartDate" value="{{ request.GET.start_date|default:'' }}">
         <input type="hidden" name="end_date" id="reportEndDate" value="{{ request.GET.end_date|default:'' }}">
         <input type="hidden" name="status" id="reportStatus" value="{{ request.GET.status|default:'all' }}">
         <input type="hidden" name="category" id="reportCategory" value="{{ request.GET.category|default:'' }}">
-        <input type="hidden" name="display_currency" id="reportDisplayCurrency"
-               value="{{ request.GET.display_currency|default:'QAR' }}">
+        <input type="hidden" name="display_currency" id="reportDisplayCurrency" value="{{ request.GET.display_currency|default:'QAR' }}">
         <button type="submit" style="background-color: #e67e22;">Generate Report</button>
         <button type="button" onclick="closeReportModal()" style="background-color: #7f8c8d;">Cancel</button>
     </form>
+</div>
+
+<div class="modal" id="messageModal">
+    <div class="message-content">
+        <p id="messageText"></p>
+        <button type="button" onclick="closeMessageModal()" style="background-color: #00d4b4;">OK</button>
+    </div>
+</div>
+
+<div id="confirmDeleteModal" class="modal" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border: 1px solid #ccc; z-index: 1000;">
+    <p>Are you sure you want to delete this transaction?</p>
+    <button id="confirmYes" style="background-color: #ff4444; color: white; padding: 5px 10px; margin-right: 10px;">Yes</button>
+    <button id="confirmNo" style="background-color: #666; color: white; padding: 5px 10px;">No</button>
 </div>
 
 <div class="overlay" id="overlay"></div>

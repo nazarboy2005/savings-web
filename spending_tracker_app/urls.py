@@ -23,4 +23,11 @@ urlpatterns = [
     path('login/', views.login_view, name='login'),  # Custom login
     path('logout/', views.logout_view, name='logout'),  # Custom logout
     path('signup/', views.signup, name='signup'),
+    path('set_currency/', views.set_currency, name='set_currency'),
+    path('change_password/', views.change_password, name='change_password'),
+    path('update_currency/', views.update_currency, name='update_currency'),
+    path('clear_records/', views.clear_records, name='clear_records'),
+    path('update_category/', views.update_category, name='update_category'),
+    path('categories/', views.categories, name='categories'),
+path('delete_category/<int:category_id>/', views.delete_category, name='delete_category'),
 ]

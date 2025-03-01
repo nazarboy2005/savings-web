@@ -2,83 +2,64 @@
 {% load static %}
 {% block title %}Profile - Spending Tracker{% endblock %}
 {% block content %}
-    <h1>User Profile</h1>
-    <p>View your financial overview and recommendations.</p>
+<h1>Profile</h1>
+<p>Total Earned: {{ total_earned }} {{ display_currency }}</p>
+<p>Total Spent: {{ total_spent }} {{ display_currency }}</p>
+<p>AI Recommendation: {{ ai_recommendation }}</p>
 
-    <div class="plan-section">
-        <label for="monthlyBudget">Set Monthly Budget (QAR):</label>
-        <input type="number" id="monthlyBudget" min="0" step="0.01" placeholder="Enter budget...">
-        <button onclick="setBudget()">Set Budget</button>
-    </div>
+<h2>Settings</h2>
+<div class="login-container">
+    <!-- Change Password -->
+    <h3>Change Password</h3>
+    <form method="post" action="{% url 'spending_tracker_app:change_password' %}">
+        {% csrf_token %}
+        <label for="old_password">Old Password:</label>
+        <input type="password" name="old_password" id="old_password" required>
+        <label for="new_password">New Password:</label>
+        <input type="password" name="new_password" id="new_password" required>
+        <button type="submit">Change Password</button>
+        {% if error %}<p style="color: #ff6666;">{{ error }}</p>{% endif %}
+    </form>
 
-    <div class="plan-summary">
-        <p>Total Earned: {{ total_earned }} {{ display_currency }}</p>
-        <p>Total Spent: {{ total_spent }} {{ display_currency }}</p>
-        <p id="budgetStatus"></p>
-        <p>{{ ai_recommendation }}</p>
-    </div>
+    <!-- Clear Records -->
+    <h3>Clear All Records</h3>
+    <button onclick="confirmClearRecords()">Clear All Records</button>
 
-    <h2>Your Plans</h2>
-    <table id="planTable">
-        <thead>
-            <tr>
-                <th>Plan</th>
-                <th>Description</th>
-                <th>Category</th>
-                <th>From Date</th>
-                <th>To Date</th>
-                <th>Left Money</th>
-                <th>Status</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for plan in plans %}
-            <tr>
-                <td>{{ plan.type|title }}</td>
-                <td>{{ plan.description }}</td>
-                <td>{{ plan.categories.all|join:", " }}</td>
-                <td>{{ plan.from_date|date:"Y-m-d" }}</td>
-                <td>{{ plan.to_date|date:"Y-m-d" }}</td>
-                <td>{{ plan.left_money }} {{ display_currency }}</td>
-                <td>{{ plan.status }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <!-- Change Preferred Currency -->
+    <h3>Change Preferred Currency</h3>
+    <form method="post" action="{% url 'spending_tracker_app:update_currency' %}">
+        {% csrf_token %}
+        <label for="preferred_currency">Preferred Currency:</label>
+        <select name="preferred_currency" id="preferred_currency" required>
+            <option value="EUR" {% if request.session.preferred_currency == 'EUR' %}selected{% endif %}>EUR</option>
+            <option value="GBP" {% if request.session.preferred_currency == 'GBP' %}selected{% endif %}>GBP</option>
+            <option value="JPY" {% if request.session.preferred_currency == 'JPY' %}selected{% endif %}>JPY</option>
+        </select>
+        <button type="submit">Update Currency</button>
+    </form>
+</div>
 
-    <script src="{% static 'js/script.js' %}"></script>
-    <script>
-        function setBudget() {
-            const budget = parseFloat(document.getElementById("monthlyBudget").value);
-            if (isNaN(budget) || budget <= 0) {
-                alert("Please enter a valid budget!");
-                return;
-            }
-            console.log("Setting monthly budget:", budget);
-            // Comment out or remove this fetch if you don’t want to implement /set_budget/
-            /*
-            fetch('/set_budget/', {
+<script>
+    function confirmClearRecords() {
+        if (confirm("Are you sure you want to clear all records? This action cannot be undone.")) {
+            fetch('/clear_records/', {
                 method: 'POST',
                 headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRFToken': getCookie('csrftoken')
-                },
-                body: JSON.stringify({ budget: budget })
+                    'X-CSRFToken': getCookie('csrftoken'),
+                    'X-Requested-With': 'XMLHttpRequest'
+                }
             })
-            .then(response => {
-                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
-                return response.json();
-            })
+            .then(response => response.json())
             .then(data => {
-                console.log("Budget set:", data);
-                updatePlanStatus();
+                if (data.success) {
+                    alert("Records cleared successfully.");
+                    location.reload();
+                } else {
+                    alert(`Error: ${data.error}`);
+                }
             })
-            .catch(error => {
-                console.error('Error setting budget:', error);
-                alert("Failed to set budget. Check console for details.");
-            });
-            */
-            alert("Budget setting functionality not implemented. Please contact admin.");
+            .catch(error => alert(`Failed to clear records: ${error}`));
         }
-    </script>
+    }
+</script>
 {% endblock %}

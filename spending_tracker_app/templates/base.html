@@ -10,28 +10,29 @@
 </head>
 <body>
     <header>
-        <div class="logo">💰 SpendingTracker</div>
-        <nav>
-            <ul>
-                <li><a href="{% url 'spending_tracker_app:index' %}">Home</a></li>
-                <li><a href="{% url 'spending_tracker_app:charts' %}">Charts</a></li>
-                <li><a href="{% url 'spending_tracker_app:plans' %}">Plan</a></li>
-                <li><a href="{% url 'spending_tracker_app:profile' %}">Profile</a></li>
-                <li>
-                    {% if user.is_authenticated %}
-                        <a href="#" onclick="openLogoutModal()">Logout</a>
-                    {% else %}
-                        <a href="{% url 'login' %}">Login</a>
-                    {% endif %}
-                </li>
-                <li>
-                    {% if not user.is_authenticated %}
-                        <a href="{% url 'spending_tracker_app:signup' %}">Sign Up</a>
-                    {% endif %}
-                </li>
-            </ul>
-        </nav>
-    </header>
+    <div class="logo">💰 SpendingTracker</div>
+    <nav>
+        <ul>
+            <li><a href="{% url 'spending_tracker_app:index' %}">Home</a></li>
+            <li><a href="{% url 'spending_tracker_app:charts' %}">Charts</a></li>
+            <li><a href="{% url 'spending_tracker_app:plans' %}">Plan</a></li>
+            <li><a href="{% url 'spending_tracker_app:profile' %}">Profile</a></li>
+            <li><a href="{% url 'spending_tracker_app:categories' %}">Categories</a></li>
+            <li>
+                {% if user.is_authenticated %}
+                    <a href="#" onclick="openLogoutModal()">Logout</a>
+                {% else %}
+                    <a href="{% url 'login' %}">Login</a>
+                {% endif %}
+            </li>
+            <li>
+                {% if not user.is_authenticated %}
+                    <a href="{% url 'spending_tracker_app:signup' %}">Sign Up</a>
+                {% endif %}
+            </li>
+        </ul>
+    </nav>
+</header>
 
     <main>
         {% if messages %}
