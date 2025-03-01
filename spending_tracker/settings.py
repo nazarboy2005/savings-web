@@ -23,13 +23,12 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'spending_tracker_app',
-
 ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',  # ✅ Optimized static file handling
+    'whitenoise.middleware.WhiteNoiseMiddleware',  # Whitenoise for static files
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
@@ -61,8 +60,8 @@ DATABASES = {
     'default': dj_database_url.config(
         default=os.getenv('DATABASE_URL'),
         engine='django.db.backends.postgresql',
-        conn_max_age=600,  # ✅ Keeps database connections open
-        ssl_require=True  # ✅ Ensures secure connection
+        conn_max_age=600,  # Keeps database connections open
+        ssl_require=True   # Ensures secure connection
     )
 }
 
@@ -78,17 +77,21 @@ TIME_ZONE = 'UTC'
 USE_I18N = True
 USE_TZ = True
 
+# Static files (CSS, JavaScript, Images)
 STATIC_URL = '/static/'
+# We tell Django that "spending_tracker_app/static" is an extra directory of static files
 STATICFILES_DIRS = [BASE_DIR / "spending_tracker_app/static"]
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"  # ✅ Compression enabled
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+# Auth redirect settings
 LOGIN_URL = '/accounts/login/'
 LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# Production security settings (adjust if needed)
 SECURE_SSL_REDIRECT = True
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 CSRF_COOKIE_SECURE = True
