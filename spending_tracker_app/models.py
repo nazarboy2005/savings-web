@@ -3,11 +3,15 @@ from django.contrib.auth.models import User
 import datetime
 
 class Category(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    user = models.ForeignKey(User, on_delete=models.CASCADE)  # Add this line to associate categories with users
+    name = models.CharField(max_length=100)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True)  # Nullable for shared categories
+    is_global = models.BooleanField(default=False)  # Flag for shared/global categories
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        unique_together = [['name', 'user']]  # Ensures uniqueness within a user's categories, but allows global duplicates
 
 class Transaction(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE)
