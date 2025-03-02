@@ -799,7 +799,7 @@ def set_currency(request):
         if preferred_currency:
             request.session['preferred_currency'] = preferred_currency
             return redirect('spending_tracker_app:index')
-    return render(request, 'profile.html')
+    return render(request, 'set_currency.html')
 
 
 @login_required

@@ -1,36 +1,13 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Profile - Spending Tracker{% endblock %}
+{% block title %}Set Currency Preference - Spending Tracker{% endblock %}
 {% block content %}
-<h1>Profile</h1>
-<p>Total Earned: {{ total_earned }} {{ display_currency }}</p>
-<p>Total Spent: {{ total_spent }} {{ display_currency }}</p>
-<p>AI Recommendation: {{ ai_recommendation }}</p>
-
-<h2>Settings</h2>
 <div class="login-container">
-    <!-- Change Password -->
-    <h3>Change Password</h3>
-    <form method="post" action="{% url 'spending_tracker_app:change_password' %}">
-        {% csrf_token %}
-        <label for="old_password">Old Password:</label>
-        <input type="password" name="old_password" id="old_password" required>
-        <label for="new_password">New Password:</label>
-        <input type="password" name="new_password" id="new_password" required>
-        <button type="submit">Change Password</button>
-        {% if error %}<p style="color: #ff6666;">{{ error }}</p>{% endif %}
-    </form>
-
-    <!-- Clear Records -->
-    <h3>Clear All Records</h3>
-    <button onclick="confirmClearRecords()">Clear All Records</button>
-
-    <!-- Change Preferred Currency -->
-    <h3>Change Preferred Currency</h3>
-    <form method="post" action="{% url 'spending_tracker_app:update_currency' %}">
+    <h2>Set Your Preferred Currency</h2>
+        <form method="post" action="{% url 'spending_tracker_app:update_currency' %}">
         {% csrf_token %}
         <label for="preferred_currency">Preferred Currency:</label>
-        <select name="preferred_currency" id="preferred_currency" required class="custom-select">
+<select name="preferred_currency" id="preferred_currency" required class="custom-select">
     <option value="" disabled selected>Select Currency</option>
     <option value="AED" {% if request.session.preferred_currency == 'AED' %}selected{% endif %}>United Arab Emirates Dirham (AED)</option>
     <option value="AFN" {% if request.session.preferred_currency == 'AFN' %}selected{% endif %}>Afghan Afghani (AFN)</option>
@@ -250,44 +227,4 @@
     margin-bottom: 10px; /* Align with other input elements */
 }
 </style>
-
-<script>
-    function confirmClearRecords() {
-        if (confirm("Are you sure you want to clear all records? This action cannot be undone.")) {
-            fetch('/clear_records/', {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': getCookie('csrftoken'),
-                    'X-Requested-With': 'XMLHttpRequest'
-                }
-            })
-            .then(response => response.json())
-            .then(data => {
-                if (data.success) {
-                    alert("Records cleared successfully.");
-                    location.reload();
-                } else {
-                    alert(`Error: ${data.error}`);
-                }
-            })
-            .catch(error => alert(`Failed to clear records: ${error}`));
-        }
-    }
-
-    // Ensure getCookie function is available (assuming it's in base.html or script.js)
-    function getCookie(name) {
-        let cookieValue = null;
-        if (document.cookie && document.cookie !== '') {
-            const cookies = document.cookie.split(';');
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-                if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
-        }
-        return cookieValue;
-    }
-</script>
 {% endblock %}
