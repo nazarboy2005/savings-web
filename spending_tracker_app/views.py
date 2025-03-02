@@ -603,6 +603,11 @@ def generate_report(request):
             return response
 
         elif format == "pdf":
+            from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+            from reportlab.lib import colors
+            from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+            from reportlab.lib.units import inch
+
             buffer = BytesIO()
             doc = SimpleDocTemplate(buffer, pagesize=LETTER,
                                     rightMargin=72, leftMargin=72,
@@ -611,6 +616,16 @@ def generate_report(request):
             styles = getSampleStyleSheet()
             flowables.append(Paragraph("Spending Tracker Report", styles["Title"]))
             flowables.append(Spacer(1, 12))  # some vertical space
+
+            # Define a custom style for wrapped text in the description
+            description_style = ParagraphStyle(
+                'DescriptionStyle',
+                parent=styles['Normal'],
+                wordWrap='CJK',  # Enables word wrapping
+                fontSize=10,
+                leading=12,
+            )
+
             table_data = [
                 ["Date", "Status", "Category", "Amount", "Currency", "Description"]
             ]
@@ -621,9 +636,12 @@ def generate_report(request):
                     t.get("category__name") or "N/A",
                     str(t["amount"]),
                     t["currency"],
-                    t["description"],
+                    Paragraph(t["description"], description_style),  # Wrap description text
                 ])
-            table = Table(table_data, colWidths=[80, 60, 80, 60, 60, 200])
+
+            # Define column widths to ensure description has enough space
+            col_widths = [80, 60, 80, 60, 60, 200]  # Adjust 200 for description to allow wrapping
+            table = Table(table_data, colWidths=col_widths)
             table.setStyle(TableStyle([
                 ("BACKGROUND", (0, 0), (-1, 0), colors.Color(0.2, 0.5, 0.8)),  # bluish
                 ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
@@ -632,7 +650,11 @@ def generate_report(request):
                 ("GRID", (0, 0), (-1, -1), 1, colors.black),
                 ("ALIGN", (3, 1), (4, -1), "RIGHT"),
                 ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                # Ensure description column wraps text
+                ("LEFTPADDING", (5, 1), (5, -1), 5),
+                ("RIGHTPADDING", (5, 1), (5, -1), 5),
             ]))
+
             flowables.append(table)
 
             doc.build(flowables)
@@ -641,6 +663,8 @@ def generate_report(request):
             response['Content-Disposition'] = f'attachment; filename="{filename}.pdf"'
             return response
     return JsonResponse({'error': 'Invalid request method'}, status=400)
+
+
 
 @login_required
 def categories(request):
