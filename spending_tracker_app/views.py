@@ -890,8 +890,8 @@ def update_currency(request):
         preferred_currency = request.POST.get('preferred_currency')
         if preferred_currency:
             request.session['preferred_currency'] = preferred_currency
-        return redirect('spending_tracker_app:profile')
-    return redirect('spending_tracker_app:profile')
+        return redirect('spending_tracker_app:index')
+    return redirect('spending_tracker_app:index')
 
 @login_required
 def clear_records(request):
