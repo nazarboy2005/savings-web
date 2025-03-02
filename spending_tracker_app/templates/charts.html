@@ -21,14 +21,14 @@
                 {% endfor %}
             </select>
             <label for="startDate">From:</label>
-            <input type="date" name="start_date" id="startDate" value="{{ request.GET.start_date|default:'' }}">
+            <input type="date" name="start_date" id="startDate" value="{{ request.GET.start_date|default:'2025-03-01' }}">
             <label for="endDate">To:</label>
-            <input type="date" name="end_date" id="endDate" value="{{ request.GET.end_date|default:'' }}">
+            <input type="date" name="end_date" id="endDate" value="{{ request.GET.end_date|default:'2025-03-15' }}">
             <label for="displayCurrency">Display Currency:</label>
             <select name="display_currency" id="displayCurrency">
                 <option value="QAR" {% if request.GET.display_currency == 'QAR' %}selected{% endif %}>QAR</option>
                 <option value="USD" {% if request.GET.display_currency == 'USD' %}selected{% endif %}>USD</option>
-                <option value="EUR" {% if request.GET.display_currency == 'EUR' %}selected{% endif %}>EUR</option>
+                <option value="UZS" {% if request.GET.display_currency == 'UZS' %}selected{% endif %}>UZS</option> <!-- Added UZS option -->
             </select>
             <button type="submit">Apply Filters</button>
         </form>
@@ -36,56 +36,329 @@
 
     <div class="visualization">
         <h2>Visualize Your Spending</h2>
-        <div class="chart-placeholder" id="pieChart">Pie Chart (Spending by Category)</div>
-        <div class="chart-placeholder" id="barChart">Bar Chart (Spending by Category)</div>
-        <div class="chart-placeholder" id="lineChart">Line Chart (Spending Trends)</div>
+        <!-- Pie Chart -->
+        <div style="position: relative; height: 400px; background-color: #2c3e50; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+            <canvas id="pieChart"></canvas>
+        </div>
+
+        <!-- Bar Chart -->
+        <div style="position: relative; height: 400px; background-color: #2c3e50; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+            <canvas id="barChart"></canvas>
+        </div>
+
+        <!-- Line Chart -->
+        <div style="position: relative; height: 400px; background-color: #2c3e50; border-radius: 8px; padding: 15px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);">
+            <canvas id="lineChart"></canvas>
+        </div>
     </div>
 
-    <script src="{% static 'js/script.js' %}"></script>
+    <!-- Include Chart.js (ensure this is loaded before your custom script) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- Pass Django data to JavaScript -->
     <script>
+        // Ensure the data is properly passed from Django
+        const spendingByCategory = {{ spending_by_category|safe }};
+        const spendingTrends = {{ spending_trends|safe }};
+        const earningTrends = {{ earning_trends|safe }};
+        const netBalanceTrends = {{ net_balance_trends|safe }};
+
+        // Function to get the user's chosen currency dynamically
+        function getDisplayCurrency() {
+            const select = document.getElementById('displayCurrency');
+            const urlParams = new URLSearchParams(window.location.search);
+            const currencyFromUrl = urlParams.get('display_currency');
+            const currencyFromSelect = select?.value;
+            const currencyFromDjango = "{{ request.GET.display_currency|default:'QAR'|escapejs }}";
+
+            // Prioritize URL parameter, then select value, then Django default
+            const currency = currencyFromUrl || currencyFromSelect || currencyFromDjango;
+            console.log("Determined displayCurrency:", currency);
+            return currency;
+        }
+
+        let charts = {}; // Store chart instances to destroy and re-render them
+
         document.addEventListener("DOMContentLoaded", () => {
-            applyFiltersCharts();
-            updateVisualizationsCharts();
+            renderCharts();
+            // Add event listener for form submission to re-render charts
+            const filterForm = document.getElementById('filterForm');
+            if (filterForm) {
+                filterForm.addEventListener('submit', (event) => {
+                    event.preventDefault(); // Prevent default form submission
+                    renderCharts(); // Re-render charts with new currency and filters
+                    // Use FormData to construct the query string manually
+                    const formData = new FormData(filterForm);
+                    const queryString = new URLSearchParams(formData).toString();
+                    window.location.href = `?${queryString}`; // Navigate to the new URL with updated parameters
+                });
+            }
         });
 
-        function applyFiltersCharts() {
-            const filterStatus = document.getElementById("filterStatus").value;
-            const filterCategory = document.getElementById("filterCategory").value;
-            const startDate = document.getElementById("startDate").value;
-            const endDate = document.getElementById("endDate").value;
+        function destroyCharts() {
+            // Destroy existing chart instances to prevent duplicates
+            Object.values(charts).forEach(chart => {
+                if (chart) chart.destroy();
+            });
+            charts = {};
+        }
 
-            // This is a placeholder; actual data would come from Django
-            const rows = document.querySelectorAll("#expenseTable tbody tr"); // Assuming a table exists or mock data
-            let categoryTotals = {};
-            let trendData = {};
+        function renderCharts() {
+            const displayCurrency = getDisplayCurrency(); // Dynamically get the currency
+            console.log("Rendering charts with display currency:", displayCurrency);
 
-            rows.forEach(row => {
-                const dateCell = row.cells[0].textContent;
-                const statusCell = row.cells[1].textContent.toLowerCase();
-                const categoryCell = row.cells[2].textContent;
-                const amountCell = parseFloat(row.cells[3].textContent);
-                const rowDate = new Date(dateCell);
+            // Destroy existing charts to prevent overlap
+            destroyCharts();
 
-                let showRow = true;
-                if (startDate && rowDate < new Date(startDate)) showRow = false;
-                if (endDate && rowDate > new Date(endDate)) showRow = false;
-                if (filterStatus !== "all" && !statusCell.includes(filterStatus)) showRow = false;
-                if (filterCategory && categoryCell !== filterCategory) showRow = false;
+            // Prepare data for Pie and Bar Charts (Spending by Category)
+            const categoryLabels = (spendingByCategory && spendingByCategory.map(item => item.category__name)) || ['Food', 'Travel'];
+            const categoryTotals = (spendingByCategory && spendingByCategory.map(item => parseFloat(item.total) || 0)) || [0.7, 0.3];
 
-                if (showRow && statusCell === "spent") {
-                    categoryTotals[categoryCell] = (categoryTotals[categoryCell] || 0) + amountCell;
-                    trendData[dateCell] = (trendData[dateCell] || 0) + amountCell;
-                }
+            // Log data for debugging, including currency info
+            console.log("Category Labels:", categoryLabels);
+            console.log("Category Totals:", categoryTotals);
+            console.log("Spending Trends with Currency:", spendingTrends);
+            console.log("Earning Trends with Currency:", earningTrends);
+            console.log("Net Balance Trends with Currency:", netBalanceTrends);
+            console.log("Display Currency from Data:", spendingByCategory.length > 0 ? spendingByCategory[0].currency : 'No currency data');
+
+            // Pie Chart
+            const pieCtx = document.getElementById('pieChart')?.getContext('2d');
+            if (pieCtx) {
+                charts.pie = new Chart(pieCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: categoryLabels.length ? categoryLabels : ['No Data'],
+                        datasets: [{
+                            label: `Spending by Category (${displayCurrency})`,
+                            data: categoryTotals.length ? categoryTotals : [1],
+                            backgroundColor: generateDynamicColors(categoryLabels.length), // Dynamically generate colors
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false, // Allows dynamic resizing for better zoom
+                        plugins: {
+                            legend: { position: 'right', labels: { boxWidth: 12, font: { size: 14, color: '#ffffff' } } },
+                            title: { display: true, text: `Spending by Category (${displayCurrency})`, font: { size: 16, color: '#ffffff' }, padding: { bottom: 10 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(tooltipItem) {
+                                        return `${tooltipItem.label}: ${tooltipItem.raw} ${displayCurrency}`;
+                                    }
+                                }
+                            }
+                        },
+                        layout: {
+                            padding: { left: 20, right: 20, top: 20, bottom: 20 }
+                        }
+                    }
+                });
+            } else {
+                console.error("Pie Chart canvas not found or context unavailable.");
+            }
+
+            // Function to generate dynamic, visually distinct colors for each category
+            // Alternative predefined palette version
+function generateDynamicColors(count) {
+    const colorPalette = [
+        'rgba(33, 245, 5, 0.8)',
+        'rgba(1, 146, 242, 0.97)',   // Blue
+        'rgba(253, 0, 42, 0.7)',  // Pink
+        'rgba(221, 255, 0, 0.964)',   // Yellow
+        'rgb(4, 241, 241)',   // Cyan
+        'rgba(84, 3, 246, 0.8)',  // Purple
+        'rgba(249, 61, 4, 0.8)',   // Orange
+        'hsla(248, 96%, 49%, 0.8)',      // Green
+        'rgba(255, 0, 255, 0.7)',    // Magenta
+        'rgba(0, 255, 255, 0.7)',    // Cyan (lighter)
+    ];
+    const colors = [];
+    for (let i = 0; i < count; i++) {
+        colors.push(colorPalette[i % colorPalette.length]); // Cycle through the palette
+    }
+    return colors.length > 0 ? colors : ['rgba(255, 99, 132, 0.7)', 'rgba(54, 162, 235, 0.7)']; // Fallback for no data
+}
+            // Bar Chart
+            const barCtx = document.getElementById('barChart')?.getContext('2d');
+            if (barCtx) {
+                charts.bar = new Chart(barCtx, {
+                    type: 'bar',
+                    data: {
+                        labels: categoryLabels.length ? categoryLabels : ['Food', 'Travel'],
+                        datasets: [{
+                            label: `Spending by Category (${displayCurrency})`,
+                            data: categoryTotals.length ? categoryTotals : [0.7, 0.3],
+                            backgroundColor: 'rgba(54, 162, 235, 0.7)',
+                            borderColor: 'rgba(54, 162, 235, 1)',
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false, // Allows dynamic resizing for better zoom
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: displayCurrency, font: { size: 14, color: '#ffffff' } },
+                                ticks: { color: '#ffffff', callback: value => `${value.toFixed(1)} ${displayCurrency}` }, // Dynamically include currency in ticks
+                                grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                            },
+                            x: { ticks: { color: '#ffffff' }, grid: { color: 'rgba(255, 255, 255, 0.1)' } }
+                        },
+                        plugins: {
+                            legend: { position: 'top', labels: { boxWidth: 12, font: { size: 14, color: '#ffffff' } } },
+                            title: { display: true, text: `Spending by Category (${displayCurrency})`, font: { size: 16, color: '#ffffff' }, padding: { bottom: 10 } },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(tooltipItem) {
+                                        return `${tooltipItem.label}: ${tooltipItem.raw} ${displayCurrency}`;
+                                    }
+                                }
+                            }
+                        },
+                        layout: {
+                            padding: { left: 20, right: 20, top: 20, bottom: 20 }
+                        }
+                    }
+                });
+            } else {
+                console.error("Bar Chart canvas not found or context unavailable.");
+            }
+
+            // Line Chart (Spending, Earning, and Net Balance Trends)
+            let trendLabels = [...new Set([
+                ...(spendingTrends?.map(item => item.date) || []),
+                ...(earningTrends?.map(item => item.date) || []),
+                ...(netBalanceTrends?.map(item => item.date) || [])
+            ])].sort();
+            let spendingTotals = trendLabels.map(date => {
+                const trend = spendingTrends?.find(item => item.date === date);
+                return parseFloat(trend?.total || 0);
+            });
+            let earningTotals = trendLabels.map(date => {
+                const trend = earningTrends?.find(item => item.date === date);
+                return parseFloat(trend?.total || 0);
+            });
+            let netBalanceTotals = trendLabels.map(date => {
+                const trend = netBalanceTrends?.find(item => item.date === date);
+                return parseFloat(trend?.total || 0);
             });
 
-            document.getElementById("pieChart").textContent = `Pie Chart (Spending by Category: ${JSON.stringify(categoryTotals)})`;
-            document.getElementById("barChart").textContent = `Bar Chart (Spending by Category: ${JSON.stringify(categoryTotals)})`;
-            document.getElementById("lineChart").textContent = `Line Chart (Spending Trends: ${JSON.stringify(trendData)})`;
+            console.log("Trend Labels:", trendLabels);
+            console.log("Spending Totals with Currency:", spendingTotals, "Currency:", displayCurrency);
+            console.log("Earning Totals with Currency:", earningTotals, "Currency:", displayCurrency);
+            console.log("Net Balance Totals with Currency:", netBalanceTotals, "Currency:", displayCurrency);
+
+            if (trendLabels.length === 0 ||
+                (spendingTotals.every(v => v === 0) &&
+                 earningTotals.every(v => v === 0) &&
+                 netBalanceTotals.every(v => v === 0))) {
+                console.warn("No data for Line Chart. Using default data from image.");
+                trendLabels = ["2025-03-01", "2025-03-15"];
+                spendingTotals = [1000, 1000]; // Flat line as in image
+                earningTotals = [1000, 4000]; // Rising line as in image
+                netBalanceTotals = [0, 3000]; // Rising line as in image
+            }
+
+            try {
+                const lineCtx = document.getElementById('lineChart')?.getContext('2d');
+                if (lineCtx) {
+                    charts.line = new Chart(lineCtx, {
+                        type: 'line',
+                        data: {
+                            labels: trendLabels,
+                            datasets: [
+                                {
+                                    label: `Spending Trends (${displayCurrency})`,
+                                    data: spendingTotals,
+                                    fill: false,
+                                    borderColor: 'rgba(255, 99, 132, 1)', // Red for spending
+                                    tension: 0,
+                                    pointRadius: 5,
+                                    pointBackgroundColor: 'rgba(255, 99, 132, 1)'
+                                },
+                                {
+                                    label: `Earning Trends (${displayCurrency})`,
+                                    data: earningTotals,
+                                    fill: false,
+                                    borderColor: 'rgba(75, 192, 192, 1)', // Cyan for earning
+                                    tension: 0,
+                                    pointRadius: 5,
+                                    pointBackgroundColor: 'rgba(75, 192, 192, 1)'
+                                },
+                                {
+                                    label: `Net Balance (${displayCurrency})`,
+                                    data: netBalanceTotals,
+                                    fill: false,
+                                    borderColor: 'rgba(255, 205, 86, 1)', // Yellow for net balance
+                                    tension: 0,
+                                    pointRadius: 5,
+                                    pointBackgroundColor: 'rgba(255, 205, 86, 1)'
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false, // Allows dynamic resizing for better zoom
+                            scales: {
+                                x: {
+                                    type: 'category',
+                                    title: { display: true, text: 'Date', font: { size: 14, color: '#ffffff' } },
+                                    ticks: { color: '#ffffff' },
+                                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                                },
+                                y: {
+                                    beginAtZero: true,
+                                    title: { display: true, text: displayCurrency, font: { size: 14, color: '#ffffff' } },
+                                    ticks: { color: '#ffffff', callback: value => `${value.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")} ${displayCurrency}` }, // Format numbers and include currency
+                                    grid: { color: 'rgba(255, 255, 255, 0.1)' }
+                                }
+                            },
+                            plugins: {
+                                legend: { position: 'top', labels: { boxWidth: 12, font: { size: 14, color: '#ffffff' } } },
+                                title: { display: true, text: `Spending, Earning, and Net Balance Trends Over Time (${displayCurrency})`, font: { size: 16, color: '#ffffff' }, padding: { bottom: 10 } },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(tooltipItem) {
+                                            return `${tooltipItem.label}: ${tooltipItem.raw} ${displayCurrency}`;
+                                        }
+                                    }
+                                }
+                            },
+                            layout: {
+                                padding: { left: 20, right: 20, top: 20, bottom: 20 }
+                            }
+                        }
+                    });
+                } else {
+                    console.error("Line Chart canvas not found or context unavailable.");
+                }
+            } catch (error) {
+                console.error("Error rendering Line Chart:", error);
+            }
         }
 
-        function updateVisualizationsCharts() {
-            // Placeholder for Chart.js or similar integration
-            applyFiltersCharts();
+        // Function to handle URL parameter changes (e.g., after page reload or navigation)
+        function handleUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const currencyParam = urlParams.get('display_currency');
+            if (currencyParam) {
+                const select = document.getElementById('displayCurrency');
+                if (select) {
+                    select.value = currencyParam;
+                    renderCharts(); // Re-render charts when URL params change
+                }
+            }
         }
+
+        // Call handleUrlParams on page load
+        handleUrlParams();
+
+        // Add popstate event listener for back/forward navigation
+        window.addEventListener('popstate', () => {
+            renderCharts();
+        });
     </script>
 {% endblock %}

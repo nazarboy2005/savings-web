@@ -201,6 +201,8 @@ def index(request):
 @login_required
 def charts(request):
     transactions = Transaction.objects.filter(user=request.user).order_by('-date')
+    categories = Category.objects.filter(user=request.user)
+
     if request.method == "GET":
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
@@ -215,34 +217,71 @@ def charts(request):
         if category and category != "":
             transactions = transactions.filter(category__name=category)
 
-    # Convert spending data to display currency
+    # Convert spending and earning data to display currency
     display_currency = request.GET.get('display_currency', 'QAR')
-    spending_by_category = []
+    spending_by_category = {}
+    earning_by_category = {}
+    spending_trends = []
+    earning_trends = []
+    net_balance_trends = []  # New dataset for net balance
+
+    # Aggregate by category for spending and earning
     for t in transactions.filter(status='spent'):
         converted_amount = convert_currency(t.amount, t.currency, display_currency)
-        spending_by_category.append({
-            'category__name': t.category.name if t.category else 'N/A',
-            'total': float(converted_amount),
-        })
+        category_name = t.category.name if t.category else 'N/A'
+        spending_by_category[category_name] = spending_by_category.get(category_name, 0) + float(converted_amount)
 
-    spending_trends = []
+    for t in transactions.filter(status='earned'):
+        converted_amount = convert_currency(t.amount, t.currency, display_currency)
+        category_name = t.category.name if t.category else 'N/A'
+        earning_by_category[category_name] = earning_by_category.get(category_name, 0) + float(converted_amount)
+
+    # Convert to lists for template
+    spending_by_category_list = [{'category__name': k, 'total': v} for k, v in spending_by_category.items()]
+    earning_by_category_list = [{'category__name': k, 'total': v} for k, v in earning_by_category.items()]
+
+    # Spending and earning trends by date
     for t in transactions.filter(status='spent').values('date').annotate(total=Sum('amount')):
-        # Assuming the transactions in the queryset have a currency, use the most common currency or a default
-        common_currency = \
-        transactions.filter(status='spent').values('currency').annotate(count=Count('currency')).order_by(
-            '-count').first()['currency'] or 'QAR'
-        converted_amount = convert_currency(Decimal(str(t['total'])), common_currency, display_currency)
+        common_currency = transactions.filter(status='spent').values('currency').annotate(count=Count('currency')).order_by('-count').first()
+        currency = common_currency['currency'] if common_currency else 'QAR'
+        converted_amount = convert_currency(Decimal(str(t['total'])), currency, display_currency)
         spending_trends.append({
             'date': t['date'].strftime('%Y-%m-%d'),
             'total': float(converted_amount),
         })
 
+    for t in transactions.filter(status='earned').values('date').annotate(total=Sum('amount')):
+        common_currency = transactions.filter(status='earned').values('currency').annotate(count=Count('currency')).order_by('-count').first()
+        currency = common_currency['currency'] if common_currency else 'QAR'
+        converted_amount = convert_currency(Decimal(str(t['total'])), currency, display_currency)
+        earning_trends.append({
+            'date': t['date'].strftime('%Y-%m-%d'),
+            'total': float(converted_amount),
+        })
+
+    # Calculate net balance trends (earnings - spending) cumulatively
+    all_dates = sorted(set([t['date'].strftime('%Y-%m-%d') for t in transactions.values('date')]))
+    net_balance = 0
+    for date in all_dates:
+        spending_on_date = next((t['total'] for t in spending_trends if t['date'] == date), 0)
+        earning_on_date = next((t['total'] for t in earning_trends if t['date'] == date), 0)
+        net_balance += (earning_on_date - spending_on_date)  # Cumulative balance
+        net_balance_trends.append({
+            'date': date,
+            'total': float(net_balance),
+        })
+
     context = {
-        'spending_by_category': spending_by_category,
+        'categories': categories,
+        'spending_by_category': spending_by_category_list,
+        'earning_by_category': earning_by_category_list,
         'spending_trends': spending_trends,
+        'earning_trends': earning_trends,
+        'net_balance_trends': net_balance_trends,  # New data for net balance
         'display_currency': display_currency,
     }
     return render(request, 'charts.html', context)
+
 
 
 @login_required

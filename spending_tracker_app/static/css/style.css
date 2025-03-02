@@ -221,13 +221,20 @@ td {
     border-radius: 5px;
     width: 95%;
     text-align: center;
+    max-width: 600px;
+    display: flex;
+    /*box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);**/
+    display: flex;
+    color:white;
+     gap: 100px;
+     flex-direction: column;
 }
 
 .visualization h2 {
     color: #00d4b4;
 }
 
-.chart-placeholder {
+/*.chart-placeholder {
     height: 200px;
     background-color: #3a4060;
     margin: 10px 0;
@@ -236,6 +243,14 @@ td {
     align-items: center;
     justify-content: center;
     color: #a0a0b0;
+}*/
+
+.visualization {
+    margin: 20px 0;
+}
+canvas {
+    max-width: 100%;
+    height: auto !important;
 }
 
 /* Modal styling (updated to be wider and left-aligned) */
@@ -526,4 +541,36 @@ table td button[onclick*="deleteTransaction"]:hover {
 /* Ensure this has higher specificity than .filters select */
 .login-container .custom-select {
     margin-bottom: 10px; /* Align with other input elements */
+}
+
+
+.visualization {
+    margin: 20px 0;
+    max-width: 100%;
+}
+
+.chart-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 20px; /* Space between boxes */
+    padding: 20px;
+}
+
+.chart-box {
+    background-color: #1a2530; /* Optional: background for boxes to match your theme */
+    border-radius: 8px;
+    padding: 10px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: subtle shadow for depth */
+    text-align: center;
+}
+
+.chart-box canvas {
+    max-width: 100%;
+    height: auto !important;
+}
+
+.chart-box p {
+    margin: 10px 0 0;
+    font-size: 14px;
+    color: #fff; /* Match text color to your theme */
 }
