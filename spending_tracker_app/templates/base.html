@@ -9,29 +9,29 @@
 </head>
 <body>
     <header>
-    <div class="logo">💰 SpendingTracker</div>
-    <nav>
-        <ul>
-            <li><a href="{% url 'spending_tracker_app:index' %}">Home</a></li>
-            <li><a href="{% url 'spending_tracker_app:charts' %}">Charts</a></li>
-<!--            <li><a href="{% url 'spending_tracker_app:plans' %}">Plan</a></li>-->
-            <li><a href="{% url 'spending_tracker_app:profile' %}">Profile</a></li>
-            <li><a href="{% url 'spending_tracker_app:categories' %}">Categories</a></li>
-            <li>
-                {% if user.is_authenticated %}
-                    <a href="#" onclick="openLogoutModal()">Logout</a>
-                {% else %}
-                    <a href="{% url 'login' %}">Login</a>
-                {% endif %}
-            </li>
-            <li>
-                {% if not user.is_authenticated %}
-                    <a href="{% url 'spending_tracker_app:signup' %}">Sign Up</a>
-                {% endif %}
-            </li>
-        </ul>
-    </nav>
-</header>
+        <div class="logo">💰 SpendingTracker</div>
+        <nav>
+            <ul>
+                <li><a href="{% url 'spending_tracker_app:index' %}">Home</a></li>
+                <li><a href="{% url 'spending_tracker_app:charts' %}">Charts</a></li>
+                <!--            <li><a href="{% url 'spending_tracker_app:plans' %}">Plan</a></li>-->
+                <li><a href="{% url 'spending_tracker_app:profile' %}">Profile</a></li>
+                <li><a href="{% url 'spending_tracker_app:categories' %}">Categories</a></li>
+<!--                <li>-->
+<!--                    {% if not user.is_authenticated %}-->
+<!--                        <a href="{% url 'spending_tracker_app:signup' %}">Sign Up</a>-->
+<!--                    {% endif %}-->
+<!--                </li>-->
+<!--                <li>-->
+<!--                    {% if user.is_authenticated %}-->
+<!--                        <a href="#" onclick="openLogoutModal()">Logout</a>-->
+<!--                    {% else %}-->
+<!--                        <a href="{% url 'login' %}">Login</a>-->
+<!--                    {% endif %}-->
+<!--                </li>-->
+            </ul>
+        </nav>
+    </header>
 
     <main>
         {% if messages %}
@@ -81,6 +81,7 @@
     <div class="overlay" id="overlay"></div>
 
     <script>
+        // CSRF Token Handling (essential for all AJAX requests)
         function getCookie(name) {
             let cookieValue = null;
             if (document.cookie && document.cookie !== '') {
@@ -96,12 +97,8 @@
             return cookieValue;
         }
         const csrftoken = getCookie('csrftoken');
-    </script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-    <script src="{% static 'js/script.js' %}"></script>
-    <script>
+
+        // Modal Functions (essential for base.html modals)
         function openLogoutModal() {
             document.getElementById("logoutModal").style.display = "block";
             document.getElementById("overlay").style.display = "block";
@@ -143,5 +140,7 @@
             document.getElementById("overlay").style.display = "none";
         }
     </script>
+    <!-- Assuming script.js contains page-specific logic (e.g., transactions, categories, plans) -->
+    <script src="{% static 'js/script.js' %}"></script>
 </body>
 </html>

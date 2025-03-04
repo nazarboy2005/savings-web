@@ -544,24 +544,37 @@ table td button[onclick*="deleteTransaction"]:hover {
 }
 
 
+/* Ensure the visualization container has some flexibility */
 .visualization {
-    margin: 20px 0;
-    max-width: 100%;
+    margin: 20px auto; /* Center and add vertical margin */
+    width: 90%; /* Wider container */
+    max-width: 1400px; /* Limit maximum width */
+    position: relative;
+    background-color: #2a2f4a; /* Restore dark blue background */
+    padding: 15px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .chart-container {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-    gap: 20px; /* Space between boxes */
-    padding: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); /* Wider chart boxes */
+    gap: 10px;
+    padding: 10px;
+    justify-content: center;
+    width: 100%;
+    background-color: #2a2f4a; /* Ensure consistent background */
+    border-radius: 5px;
 }
 
 .chart-box {
-    background-color: #1a2530; /* Optional: background for boxes to match your theme */
+    background-color: #1a2530; /* Darker box for contrast */
     border-radius: 8px;
     padding: 10px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Optional: subtle shadow for depth */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     text-align: center;
+    width: 100%;
+    min-height: 400px; /* Consistent height */
 }
 
 .chart-box canvas {
@@ -572,5 +585,17 @@ table td button[onclick*="deleteTransaction"]:hover {
 .chart-box p {
     margin: 10px 0 0;
     font-size: 14px;
-    color: #fff; /* Match text color to your theme */
+    color: #fff;
+}
+
+
+.subsection-title {
+    color: #00d4b4;
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    animation: fadeInDown 0.8s ease-in-out;
 }
