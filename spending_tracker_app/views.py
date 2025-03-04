@@ -1,17 +1,19 @@
 import os
 from django.contrib.auth import update_session_auth_hash
-from django.shortcuts import render, redirect, get_object_or_404
-from django.shortcuts import render, redirect
-from django.contrib.auth import authenticate, login, logout
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.tokens import default_token_generator
+from django.contrib.sites.shortcuts import get_current_site
+from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
+from django.urls import reverse
+from django.utils.encoding import force_bytes, force_str
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.shortcuts import redirect
+from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.core.mail import send_mail
 from django.contrib import messages
-from django.core.mail import EmailMultiAlternatives
-from django.template.loader import render_to_string
-from django.utils import timezone
-from datetime import timedelta
-import uuid
 from .models import UserProfile
-from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
 from django.db import IntegrityError, transaction
@@ -26,7 +28,6 @@ import datetime
 import logging
 from decimal import Decimal
 from io import BytesIO
-from django.http import HttpResponse
 from reportlab.lib.pagesizes import LETTER
 from django.shortcuts import render
 from django.contrib.auth.models import User
@@ -44,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 # Exchange rate API configuration (using exchangerate-api.com with your valid API key)
 EXCHANGE_RATE_API_URL = "https://v6.exchangerate-api.com/v6"
-API_ACCESS_KEY = os.getenv('API_ACCESS_KEY_exchange')  # Your valid API key from exchangerate-api.com
+API_ACCESS_KEY = os.getenv('API_ACCESS_KEY_exchange')
 
 
 def test_network_connectivity():
@@ -236,6 +237,101 @@ def logout_view(request):
     return redirect('spending_tracker_app:index')
 
 
+
+def password_reset_request(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')  # Matches your template's form input name
+        try:
+            User = get_user_model()
+            user = User.objects.get(email__iexact=email)
+
+            # Check if UserProfile exists and email is verified
+            if not hasattr(user, 'userprofile') or not user.userprofile.email_verified:
+                messages.error(request, 'This email is not verified or associated with an account.')
+                return render(request, 'password_reset_form.html')
+
+            # Generate token and UID
+            token = default_token_generator.make_token(user)
+            uid = urlsafe_base64_encode(force_bytes(user.pk))
+
+            # Get current site
+            current_site = get_current_site(request)
+
+            # Render email template
+            subject = 'Password Reset Request - Spending Tracker'
+            email_template_name = 'password_reset_email.html'
+            context = {
+                'user': user,
+                'domain': current_site.domain,
+                'uid': uid,
+                'token': token,
+                'protocol': 'https' if request.is_secure() else 'http',
+            }
+            email_content = render_to_string(email_template_name, context)
+
+            # Send email
+            try:
+                send_mail(
+                    subject,
+                    '',  # Plain text body (empty, as we use HTML)
+                    settings.DEFAULT_FROM_EMAIL,
+                    [email],
+                    html_message=email_content,
+                    fail_silently=True,
+                )
+                logger.info(f"Password reset email sent to {email}")
+                return HttpResponseRedirect(reverse('spending_tracker_app:password_reset_done'))
+            except Exception as e:
+                logger.error(f"Failed to send password reset email to {email}: {str(e)}")
+                messages.error(request, 'Failed to send reset email. Please try again later.')
+                return render(request, 'password_reset_form.html')
+        except User.DoesNotExist:
+            logger.warning(f"No user found with email {email}")
+            messages.error(request, 'No user is associated with this email address.')
+            return render(request, 'password_reset_form.html')
+    return render(request, 'password_reset_form.html')
+
+
+def password_reset_done(request):
+    return render(request, 'password_reset_done.html')
+
+
+def password_reset_confirm(request, uidb64, token):
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
+        user = None
+
+    if user is not None and default_token_generator.check_token(user, token):
+        # Check if UserProfile exists and email is verified (optional, based on your requirement)
+        if not hasattr(user, 'userprofile') or not user.userprofile.email_verified:
+            messages.error(request,
+                           'This account is not verified. Please verify your email before resetting your password.')
+            return render(request, 'password_reset_confirm.html', {'error': True})
+
+        if request.method == 'POST':
+            password1 = request.POST.get('new_password1')
+            password2 = request.POST.get('new_password2')
+
+            if password1 and password2 and password1 == password2:
+                user.set_password(password1)
+                user.save()
+                return HttpResponseRedirect(reverse('spending_tracker_app:password_reset_complete'))
+            else:
+                logger.warning(f"Password mismatch during reset for user {user.username}")
+                messages.error(request, 'Passwords do not match or are empty.')
+                return render(request, 'password_reset_confirm.html', {'uidb64': uidb64, 'token': token})
+        return render(request, 'password_reset_confirm.html', {'uidb64': uidb64, 'token': token})
+    else:
+        logger.error(f"Invalid password reset token for UID {uidb64}")
+        messages.error(request, 'Invalid or expired password reset link.')
+        return render(request, 'password_reset_confirm.html', {'error': True})
+
+
+def password_reset_complete(request):
+    messages.success(request, 'Your password has been set. You may now log in.')
+    return render(request, 'password_reset_complete.html')
 
 
 
