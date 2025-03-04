@@ -129,7 +129,6 @@ function fetchTransactions() {
         updateTotals();
         showSummary();
         updatePlanStatus();
-        updateVisualizations();
         console.log("Transactions fetched and converted:", transactions);
     })
     .catch(error => {
@@ -699,7 +698,6 @@ function deleteTransaction(button, transactionId) {
                 updateTotals();
                 showSummary();
                 updatePlanStatus();
-                updateVisualizations();
                 showMessageModal("Transaction deleted successfully.", false);
                 const successModal = document.getElementById("deleteSuccessModal");
                 const successOkBtn = document.getElementById("deleteSuccessOk");
@@ -925,40 +923,6 @@ function updatePlanStatus() {
     });
 }
 
-// Update visualizations (only for dashboard page)
-function updateVisualizations() {
-    const startDate = document.getElementById("startDate")?.value;
-    const endDate = document.getElementById("endDate")?.value;
-    const table = document.getElementById("expenseTable");
-    if (!table) {
-        console.warn("Expense table not found, skipping visualizations");
-        return;
-    }
-    const rows = table.querySelectorAll("tbody tr");
-    let categoryTotals = {};
-
-    rows.forEach(row => {
-        const dateCell = row.cells[0].textContent;
-        const categoryCell = row.cells[2].textContent;
-        const amountCell = parseFloat(row.cells[3].textContent) || 0;
-        const rowDate = new Date(dateCell);
-
-        let showRow = true;
-        if (startDate && rowDate < new Date(startDate)) showRow = false;
-        if (endDate && rowDate > new Date(endDate)) showRow = false;
-
-        if (showRow && row.cells[1].textContent.toLowerCase() === "spent") {
-            categoryTotals[categoryCell] = (categoryTotals[categoryCell] || 0) + amountCell;
-        }
-    });
-
-    const pieChart = document.getElementById("pieChart");
-    const barChart = document.getElementById("barChart");
-    const lineChart = document.getElementById("lineChart");
-    if (pieChart) pieChart.textContent = `Pie Chart (Spending by Category: ${JSON.stringify(categoryTotals)})`;
-    if (barChart) barChart.textContent = `Bar Chart (Spending by Category: ${JSON.stringify(categoryTotals)})`;
-    if (lineChart) lineChart.textContent = `Line Chart (Spending Trends over ${startDate || 'N/A'} to ${endDate || 'N/A'})`;
-}
 
 // Update plan table (only for plans page)
 function updatePlanTable() {
@@ -1331,7 +1295,6 @@ function addTransaction() {
                     updateTotals();
                     showSummary();
                     updatePlanStatus();
-                    updateVisualizations();
                 })
                 .catch(err => {
                     console.error('Error fetching updated transactions:', err);
@@ -1405,7 +1368,6 @@ function updateTransaction() {
             updateTotals();
             showSummary();
             updatePlanStatus();
-            updateVisualizations();
             showMessageModal("Transaction updated successfully!", false);
         }
     })
@@ -1557,7 +1519,6 @@ function deleteTransaction(button, transactionId) {
                 updateTotals();
                 showSummary();
                 updatePlanStatus();
-                updateVisualizations();
                 showMessageModal("Transaction deleted successfully.", false);
                 const successModal = document.getElementById("deleteSuccessModal");
                 const successOkBtn = document.getElementById("deleteSuccessOk");

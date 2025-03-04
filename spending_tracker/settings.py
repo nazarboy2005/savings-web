@@ -15,6 +15,8 @@ SECRET_KEY = os.getenv('SECRET_KEY')  # Replace with a secure key
 DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
 
+ENVIRONMENT = os.getenv('ENVIRONMENT', 'development')  # Default to 'development' if not set
+
 INSTALLED_APPS = [
     'django.contrib.admin',
     'django.contrib.auth',
@@ -22,8 +24,8 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'spending_tracker_app',
-]
+    'spending_tracker_app.apps.SpendingTrackerAppConfig',  # Correct AppConfig
+    ]
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
@@ -90,3 +92,11 @@ LOGIN_REDIRECT_URL = '/'
 LOGOUT_REDIRECT_URL = '/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'killiyaezov@gmail.com'
+EMAIL_HOST_PASSWORD = "wmyahtxvziwqsdly"

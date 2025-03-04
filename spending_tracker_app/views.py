@@ -1,7 +1,16 @@
 import os
 from django.contrib.auth import update_session_auth_hash
 from django.shortcuts import render, redirect, get_object_or_404
-from django.contrib.auth.decorators import login_required
+from django.shortcuts import render, redirect
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
+from django.contrib import messages
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils import timezone
+from datetime import timedelta
+import uuid
+from .models import UserProfile
 from django.contrib.auth.forms import UserCreationForm, AuthenticationForm
 from django.contrib.auth import login, authenticate, logout
 from django.contrib.auth.decorators import login_required
@@ -19,9 +28,13 @@ from decimal import Decimal
 from io import BytesIO
 from django.http import HttpResponse
 from reportlab.lib.pagesizes import LETTER
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
+from django.shortcuts import render
+from django.contrib.auth.models import User
+from django.core.mail import EmailMultiAlternatives
+from django.template.loader import render_to_string
+from django.utils import timezone
+from datetime import timedelta
+import uuid
 import requests
 import socket
 import time
@@ -51,6 +64,179 @@ def test_network_connectivity():
     except (socket.gaierror, requests.RequestException) as e:
         logger.error(f"Network connectivity test failed: {str(e)}")
         return False
+
+
+
+def send_verification_email(user):
+    try:
+        # Check if UserProfile exists
+        if not hasattr(user, 'userprofile'):
+            return False, "User has no userprofile."
+
+        # Generate token and expiry
+        token = str(uuid.uuid4())
+        expiry = timezone.now() + timedelta(minutes=3)
+        user.userprofile.verification_token = token
+        user.userprofile.token_expiry = expiry
+        user.userprofile.save()
+
+        # Create verification link
+        verification_link = f"http://localhost:8000/verify-email/{token}/"
+
+        # Render email templates
+        html_content = render_to_string('emails/verification_email.html', {'verification_link': verification_link})
+        text_content = render_to_string('emails/verification_email.txt', {'verification_link': verification_link})
+
+        # Send email
+        email = EmailMultiAlternatives(
+            subject='Verify Your Email - Spending Tracker',
+            body=text_content,
+            from_email='noreply@spendingtracker.com',
+            to=[user.email],
+        )
+        email.attach_alternative(html_content, "text/html")
+        email.send()
+
+        return True, "Verification email sent successfully."
+    except Exception as e:
+        return False, f"Failed to send verification email: {str(e)}"
+
+# Signup View
+def signup(request):
+    if request.user.is_authenticated:
+        return redirect('spending_tracker_app:index')
+    if request.method == 'POST':
+        form = UserCreationForm(request.POST)
+        email = request.POST.get('email')
+
+        # Validate email
+        if not email:
+            messages.error(request, 'Email is required.')
+        elif User.objects.filter(email__iexact=email).exists():
+            messages.error(request, 'This email is already in use. Please use a different email.')
+        elif form.is_valid():
+            user = form.save(commit=False)
+            user.email = email
+            user.save()
+            # Verify and create UserProfile
+            if not hasattr(user, 'userprofile'):
+                UserProfile.objects.create(user=user)
+                logger.debug(f"Manually created UserProfile for {user.username}")
+            else:
+                logger.debug(f"UserProfile already exists for {user.username}")
+            success, message = send_verification_email(user)
+            if success:
+                messages.success(request, message)
+                return redirect('spending_tracker_app:signup_success')
+            else:
+                messages.error(request, message)
+        else:
+            messages.error(request, 'Please correct the errors below.')
+            for error in form.errors.values():
+                messages.error(request, error)
+    else:
+        form = UserCreationForm()
+    return render(request, 'signup.html', {'form': form})
+
+# Login View
+def login_view(request):
+    if request.method == 'POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+        logger.debug(f"Login attempt for username: {username}")
+
+        user = authenticate(request, username=username, password=password)
+        if user is not None:
+            try:
+                profile = user.userprofile
+                logger.debug(f"Profile found for {username}, email_verified: {profile.email_verified}")
+                if profile.email_verified:
+                    login(request, user)
+                    logger.debug(f"Login successful for {username}")
+                    # Get the next parameter from both GET and POST, prioritizing POST
+                    next_url = request.POST.get('next', request.GET.get('next', None))
+                    logger.debug(f"Login redirecting to next: {next_url}")
+                    if next_url:
+                        return redirect(next_url)
+                    # Default redirect to index if no valid next URL is provided
+                    return redirect('spending_tracker_app:index')
+                else:
+                    messages.warning(
+                        request,
+                        'Your account is unverified and will be deleted within 3 minutes unless you verify your email. '
+                        '<a href="{% url "spending_tracker_app:resend_verification" %}">Resend verification email</a>.'
+                    )
+                    logger.debug(f"Login blocked for {username}: Email not verified")
+                    return render(request, 'registration/login.html')
+            except UserProfile.DoesNotExist:
+                logger.error(f"No UserProfile found for {username} during login attempt")
+                messages.error(request, 'User profile is missing. Please contact support or sign up again.')
+                return render(request, 'registration/login.html')
+        else:
+            logger.debug(f"Authentication failed for {username}: Invalid credentials")
+            messages.error(request, 'Invalid username or password.')
+            return render(request, 'registration/login.html')
+    return render(request, 'registration/login.html')
+
+# Email Verification View
+def verify_email(request, token):
+    try:
+        profile = UserProfile.objects.get(verification_token=token)
+        user = profile.user
+        logger.debug(f"Verifying email for {user.username}, Token: {token}, Valid: {profile.is_token_valid()}, Current email_verified: {profile.email_verified}")
+        if profile.is_token_valid():
+            profile.email_verified = True
+            profile.verification_token = None
+            profile.token_expiry = None
+            profile.save()
+            logger.debug(f"Email verified for {user.username}, New email_verified: {profile.email_verified}")
+            # Redirect to set_currency page after verification
+            return redirect('spending_tracker_app:email_verified')
+        else:
+            user.delete()
+            logger.debug(f"Verification failed for {user.username}, token expired")
+            return redirect('spending_tracker_app:email_verification_failed')
+    except UserProfile.DoesNotExist:
+        logger.debug(f"Verification failed: No profile found for token {token}")
+        return redirect('spending_tracker_app:email_verification_failed')
+
+
+def is_token_valid(self):
+    return self.token_expiry is not None and timezone.now() < self.token_expiry
+
+def email_verified(request):
+    return render(request, 'email_verified.html')
+
+def email_verification_failed(request):
+    return render(request, 'email_verification_failed.html')
+
+# Resend Verification Email View
+def resend_verification_email(request):
+    if request.method == 'POST':
+        email = request.POST.get('email')
+        try:
+            user = User.objects.get(email=email)
+            if not user.userprofile.email_verified:
+                send_verification_email(user)
+                messages.success(request, 'Verification email has been resent.')
+            else:
+                messages.info(request, 'This email is already verified.')
+            # Clear messages to prevent base.html from rendering duplicate
+            storage = messages.get_messages(request)
+            storage.used = True  # Mark as used to clear from storage
+        except User.DoesNotExist:
+            messages.error(request, "No user found with this email.")
+    return render(request, 'resend_verification.html')
+
+def signup_success(request):
+    return render(request, 'signup_success.html')
+# Logout View
+def logout_view(request):
+    logout(request)
+    return redirect('spending_tracker_app:index')
+
+
+
 
 
 def get_exchange_rate(from_currency, to_currency):
@@ -112,47 +298,10 @@ def convert_currency(amount, from_curr, to_curr):
         rate = Decimal('1')
     return amount * rate
 
-def login_view(request):
-    if request.user.is_authenticated:
-        return redirect('spending_tracker_app:index')
-    if request.method == 'POST':
-        form = AuthenticationForm(request, data=request.POST)
-        if form.is_valid():
-            username = form.cleaned_data.get('username')
-            password = form.cleaned_data.get('password')
-            user = authenticate(username=username, password=password)
-            if user is not None:
-                login(request, user)
-                return redirect(request.GET.get('next', 'spending_tracker_app:index'))
-    else:
-        form = AuthenticationForm()
-    return render(request, 'login.html', {'form': form})
-
-
-def signup(request):
-    if request.user.is_authenticated:
-        return redirect('spending_tracker_app:index')
-    if request.method == 'POST':
-        form = UserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
-            return redirect('spending_tracker_app:set_currency')  # Changed from 'index'
-    else:
-        form = UserCreationForm()
-    return render(request, 'signup.html', {'form': form})
-
-
-
-def logout_view(request):
-    logout(request)
-    return redirect('spending_tracker_app:index')
-
-
 @login_required
 def index(request):
     transactions = Transaction.objects.filter(user=request.user).order_by('-date')
-    categories = Category.objects.filter(user=request.user)  # Filter by user
+    categories = Category.objects.filter(user=request.user)
     if request.method == "GET":
         start_date = request.GET.get('start_date')
         end_date = request.GET.get('end_date')
@@ -167,7 +316,6 @@ def index(request):
         if category and category != "":
             transactions = transactions.filter(category__name=category)
 
-    # Convert all transaction amounts to the display currency and calculate totals
     converted_transactions = []
     total_earned = Decimal('0')
     total_spent = Decimal('0')
@@ -179,8 +327,8 @@ def index(request):
             'date': t.date.strftime('%Y-%m-%d'),
             'status': t.status,
             'category__name': t.category.name if t.category else 'undefined',
-            'amount': float(converted_amount),  # Convert to float for JSON serialization
-            'currency': display_currency,  # Use display currency for consistency
+            'amount': float(converted_amount),
+            'currency': display_currency,
             'description': t.description,
         })
         if t.status == 'earned':
@@ -188,12 +336,20 @@ def index(request):
         elif t.status == 'spent':
             total_spent += converted_amount
 
+    profile = request.user.userprofile
+    if not profile.email_verified:
+        messages.warning(
+            request,
+            'Your account is unverified and will be deleted within 3 minutes unless you verify your email. '
+            '<a href="{% url "spending_tracker_app:resend_verification" %}">Resend verification email</a>.'
+        )
+
     context = {
         'transactions': converted_transactions,
         'categories': categories,
         'display_currency': display_currency,
-        'total_earned': float(total_earned),  # Convert to float for template display
-        'total_spent': float(total_spent),  # Convert to float for template display
+        'total_earned': float(total_earned),
+        'total_spent': float(total_spent),
     }
     return render(request, 'index.html', context)
 

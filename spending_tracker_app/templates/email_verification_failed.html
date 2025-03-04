@@ -1,0 +1,34 @@
+{% extends 'authentication_base.html' %}
+{% load static %}
+
+{% block title %}Verification Failed - SpendingTracker{% endblock %}
+
+{% block messages %}
+    <!-- Leave this empty to prevent messages from appearing in the base template -->
+{% endblock %}
+
+{% block content %}
+    <div class="login-container">
+        <h2>Verification Failed</h2>
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="message-container {{ message.tags }} fade-in">
+                        <span class="message-text">{{ message|safe }}</span>
+                        <span class="close-icon" onclick="removeMessage(this)">*</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <div class="message fade-in">
+            The verification link is invalid or has expired. Please <a href="{% url 'spending_tracker_app:resend_verification' %}">request a new verification email</a>.
+        </div>
+
+    </div>
+
+    <script>
+        function removeMessage(element) {
+            element.parentElement.style.display = 'none';
+        }
+    </script>
+{% endblock %}

@@ -1,4 +1,5 @@
 from django.urls import path
+from django.contrib.auth import views as auth_views
 from . import views
 
 app_name = 'spending_tracker_app'
@@ -20,14 +21,27 @@ urlpatterns = [
     path('get_transactions/', views.get_transactions, name='get_transactions'),  # New URL for fetching transactions
     path('charts/', views.charts, name='charts'),  # New charts page
     path('profile/', views.profile, name='profile'),  # New profile page for AI recommendations
-    path('login/', views.login_view, name='login'),  # Custom login
-    path('logout/', views.logout_view, name='logout'),  # Custom logout
+    path('login/', views.login_view, name='login'),
+    path('logout/', views.logout_view, name='logout'),
     path('signup/', views.signup, name='signup'),
+    path('verify-email/<str:token>/', views.verify_email, name='verify_email'),
+    path('resend-verification/', views.resend_verification_email, name='resend_verification'),
+    path('password_reset/', auth_views.PasswordResetView.as_view(
+        template_name='password_reset_form.html'), name='password_reset'),
+    path('password_reset/done/', auth_views.PasswordResetDoneView.as_view(
+        template_name='password_reset_done.html'), name='password_reset_done'),
+    path('reset/<uidb64>/<token>/', auth_views.PasswordResetConfirmView.as_view(
+        template_name='password_reset_confirm.html'), name='password_reset_confirm'),
+    path('reset/done/', auth_views.PasswordResetCompleteView.as_view(
+            template_name='password_reset_complete.html'), name='password_reset_complete'),
+    path('signup-success/', views.signup_success, name='signup_success'),
+    path('email-verified/', views.email_verified, name='email_verified'),
+    path('email-verification-failed/', views.email_verification_failed, name='email_verification_failed'),
     path('set_currency/', views.set_currency, name='set_currency'),
     path('change_password/', views.change_password, name='change_password'),
     path('update_currency/', views.update_currency, name='update_currency'),
     path('clear_records/', views.clear_records, name='clear_records'),
     path('update_category/', views.update_category, name='update_category'),
     path('categories/', views.categories, name='categories'),
-path('delete_category/<int:category_id>/', views.delete_category, name='delete_category'),
+    path('delete_category/<int:category_id>/', views.delete_category, name='delete_category'),
 ]

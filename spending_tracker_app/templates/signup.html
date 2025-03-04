@@ -1,19 +1,42 @@
-{% extends 'base.html' %}
+{% extends 'authentication_base.html' %}
 {% load static %}
-{% block title %}Sign Up - Spending Tracker{% endblock %}
+
+{% block title %}Sign Up - SpendingTracker{% endblock %}
+
+{% block messages %}
+<!-- Leave this empty to prevent messages from appearing in the base template -->
+{% endblock %}
+
 {% block content %}
-    <div class="login-container">
-        <h2>Sign Up</h2>
-        {% if messages %}
-            {% for message in messages %}
-                <p>{{ message }}</p>
-            {% endfor %}
-        {% endif %}
-        <form method="post" action="{% url 'spending_tracker_app:signup' %}">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit">Sign Up</button>
-        </form>
-        <p>Already have an account? <a href="{% url 'login' %}">Login</a></p>
+<div class="login-container">
+    <h2>Sign Up</h2>
+    {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="message-container {{ message.tags }}">
+            <span class="message-text">{{ message }}</span>
+            <span class="close-icon" onclick="removeMessage(this)">*</span>
+        </div>
+        {% endfor %}
     </div>
+    {% endif %}
+    <form method="post" action="{% url 'spending_tracker_app:signup' %}">
+        {% csrf_token %}
+        <label for="id_username">Username:</label>
+        <input type="text" name="username" id="id_username" required>
+        <label for="id_email">Email:</label>
+        <input type="email" name="email" id="id_email" required>
+        <label for="id_password1">Password:</label>
+        <input type="password" name="password1" id="id_password1" required>
+        <label for="id_password2">Confirm Password:</label>
+        <input type="password" name="password2" id="id_password2" required>
+        <button type="submit">Sign Up</button>
+    </form>
+    <p style="text-align : center">Already have an account? <a href="{% url 'spending_tracker_app:login' %}">Login</a></p>
+</div>
+<script>
+        function removeMessage(element) {
+            element.parentElement.style.display = 'none';
+        }
+    </script>
 {% endblock %}

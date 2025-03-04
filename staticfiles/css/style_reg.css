@@ -1,0 +1,82 @@
+.message {
+    padding: 15px;
+    margin-bottom: 15px;
+    border-radius: 5px;
+    color: #fff;
+    position: relative;
+    animation: fadeIn 0.5s ease-in-out;
+    max-width: 100%;
+    box-sizing: border-box;
+    font-size: 14px; /* Slightly larger for readability */
+    line-height: 1.5; /* Better text spacing */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3); /* Subtle shadow for depth */
+    border-left: 5px solid; /* Left border for visual hierarchy */
+    transition: transform 0.2s ease; /* Subtle hover effect */
+}
+
+/* Hover effect for interactivity */
+.message:hover {
+    transform: translateY(-2px); /* Slight lift on hover */
+}
+
+/* Success message styling */
+.alert-success {
+    background: linear-gradient(145deg, #00ffcc, #00d4b4); /* Gradient matching theme */
+    border-color: #00ffcc;
+}
+
+/* Info message styling */
+.alert-info {
+    background: linear-gradient(145deg, #17a2b8, #138496);
+    border-color: #17a2b8;
+}
+
+/* Error message styling */
+.alert-error {
+    background: linear-gradient(145deg, #ff4444, #cc3333); /* Softer red gradient */
+    border-color: #ff4444;
+}
+
+/* Warning message styling */
+.alert-warning {
+    background: linear-gradient(145deg, #ffc107, #e0a800);
+    border-color: #ffc107;
+    color: #212529; /* Dark text for contrast */
+}
+
+/* Add icons using ::before pseudo-element */
+.message::before {
+    content: "";
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+/* Specific icons for each message type */
+.alert-success::before {
+    content: "✔"; /* Checkmark for success */
+    color: #006633; /* Dark green for contrast */
+}
+
+.alert-info::before {
+    content: "ℹ"; /* Info symbol */
+    color: #17a2b8;
+}
+
+.alert-error::before {
+    content: "⚠"; /* Warning symbol for errors */
+    color: #ff4444;
+}
+
+.alert-warning::before {
+    content: "⚠"; /* Warning symbol */
+    color: #ffc107;
+}
+
+/* Enhanced fade-in animation */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}

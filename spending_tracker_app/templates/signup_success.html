@@ -1,0 +1,35 @@
+{% extends 'authentication_base.html' %}
+{% load static %}
+
+{% block title %}Verification Pending - SpendingTracker{% endblock %}
+
+{% block messages %}
+    <!-- Leave this empty to prevent messages from appearing in the base template -->
+{% endblock %}
+
+{% block content %}
+    <div class="login-container">
+        <h2>Verification Pending</h2>
+        {% if messages %}
+            <div class="messages">
+                {% for message in messages %}
+                    <div class="message-container {{ message.tags }} fade-in">
+                        <span class="message-text">{{ message|safe }}</span>
+                        <span class="close-icon" onclick="removeMessage(this)">*</span>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        <div class="message fade-in">
+            A verification email has been sent to your email address. Please check your inbox and click the link to verify your account. If you don’t see the email, check your spam folder or
+            <a href="{% url 'spending_tracker_app:resend_verification' %}">click here to resend it</a>.
+        </div>
+    </div>
+
+    <!-- Add JavaScript for closing messages -->
+    <script>
+        function removeMessage(element) {
+            element.parentElement.style.display = 'none';
+        }
+    </script>
+{% endblock %}

@@ -1,23 +1,39 @@
-{% extends 'base.html' %}
+{% extends 'authentication_base.html' %}
 {% load static %}
-{% block title %}Login - Spending Tracker{% endblock %}
+
+{% block title %}Login - SpendingTracker{% endblock %}
+
+{% block messages %}
+    <!-- Leave this empty to prevent messages from appearing in the base template -->
+{% endblock %}
+
 {% block content %}
     <div class="login-container">
         <h2>Login</h2>
-        {% if messages %}
-            {% for message in messages %}
-                <p>{{ message }}</p>
-            {% endfor %}
-        {% endif %}
-        <form method="post" action="{% url 'login' %}">
+            {% if messages %}
+    <div class="messages">
+        {% for message in messages %}
+        <div class="message-container {{ message.tags }}">
+            <span class="message-text">{{ message }}</span>
+            <span class="close-icon" onclick="removeMessage(this)">*</span>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+        <form method="post" action="{% url 'spending_tracker_app:login' %}">
             {% csrf_token %}
             <label for="id_username">Username:</label>
             <input type="text" name="username" id="id_username" required>
             <label for="id_password">Password:</label>
             <input type="password" name="password" id="id_password" required>
             <button type="submit">Login</button>
-            <input type="hidden" name="next" value="{% url 'spending_tracker_app:index' %}">
+            <input type="hidden" name="next" value="{{ request.GET.next|default:'' }}">
         </form>
-        <p>Don't have an account? <a href="{% url 'spending_tracker_app:signup' %}">Sign Up</a></p>
+        <p style="text-align : center">Don’t have an account? <a href="{% url 'spending_tracker_app:signup' %}">Sign Up</a></p>
     </div>
+<script>
+        function removeMessage(element) {
+            element.parentElement.style.display = 'none';
+        }
+    </script>
 {% endblock %}

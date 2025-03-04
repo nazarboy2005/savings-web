@@ -1,6 +1,19 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 import datetime
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    email_verified = models.BooleanField(default=False)
+    verification_token = models.CharField(max_length=100, blank=True, null=True)
+    token_expiry = models.DateTimeField(blank=True, null=True)
+
+    def is_token_valid(self):
+        return self.token_expiry is not None and timezone.now() < self.token_expiry
+
+    def is_token_expired(self):
+        return self.token_expiry is not None and timezone.now() >= self.token_expiry and not self.email_verified
 
 class Category(models.Model):
     name = models.CharField(max_length=100)
