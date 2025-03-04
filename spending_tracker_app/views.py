@@ -81,9 +81,8 @@ def send_verification_email(request, user):
         user.userprofile.token_expiry = expiry
         user.userprofile.save()
 
-        host = request.get_host()
-        # Create verification link
-        verification_link = f"http://{host}/verify-email/{token}/"
+
+        verification_link = f"http://expense-tracker-2g0b.onrender.com/verify-email/{token}/"
 
         # Render email templates
         html_content = render_to_string('emails/verification_email.html', {'verification_link': verification_link})
