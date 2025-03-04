@@ -127,7 +127,6 @@ def signup(request):
                 logger.debug(f"UserProfile already exists for {user.username}")
             success, message = send_verification_email(user)
             if success:
-                messages.success(request, message)
                 return redirect('spending_tracker_app:signup_success')
             else:
                 messages.error(request, message)
