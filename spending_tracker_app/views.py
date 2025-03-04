@@ -68,7 +68,7 @@ def test_network_connectivity():
 
 
 
-def send_verification_email(request, user):
+def send_verification_email(user):
     try:
         # Check if UserProfile exists
         if not hasattr(user, 'userprofile'):
