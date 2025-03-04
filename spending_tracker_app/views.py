@@ -68,7 +68,7 @@ def test_network_connectivity():
 
 
 
-def send_verification_email(user):
+def send_verification_email(request, user):
     try:
         # Check if UserProfile exists
         if not hasattr(user, 'userprofile'):
@@ -81,8 +81,9 @@ def send_verification_email(user):
         user.userprofile.token_expiry = expiry
         user.userprofile.save()
 
+        host = request.get_host()
         # Create verification link
-        verification_link = f"http://localhost:8000/verify-email/{token}/"
+        verification_link = f"http://{host}/verify-email/{token}/"
 
         # Render email templates
         html_content = render_to_string('emails/verification_email.html', {'verification_link': verification_link})
