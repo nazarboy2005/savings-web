@@ -599,3 +599,5 @@ table td button[onclick*="deleteTransaction"]:hover {
     text-transform: uppercase;
     animation: fadeInDown 0.8s ease-in-out;
 }
+
+

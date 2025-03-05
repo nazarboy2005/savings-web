@@ -255,3 +255,69 @@ a {
 a:hover {
     text-decoration: underline;
 }
+
+
+/* styles.css */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+    }
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fadeInDown {
+    from {
+        opacity: 0;
+        transform: translateY(-20px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Error-specific styles (scoped to avoid conflicts) */
+.error-page {
+    text-align: center;
+    padding: 20px;
+    background-color: #2a2f4a; /* Slightly lighter than body for contrast */
+    border-radius: 8px;
+    margin: 20px 0;
+    color: #ffffff; /* White text for readability */
+}
+
+.error-page .error-message {
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 15px;
+    color: #00d4b4; /* Teal for emphasis, matching your accents */
+}
+
+.error-page .error-description {
+    font-size: 16px;
+    font-weight: 400;
+    margin-bottom: 20px;
+    color: #a0a0b0; /* Lighter gray for secondary text, matching your instruction text */
+}
+
+.error-page .submit-button {
+    background-color: #00d4b4; /* Teal for consistency with your app */
+    color: #fff;
+    padding: 12px 24px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    font-weight: 500;
+    transition: background-color 0.3s ease, transform 0.2s ease;
+    display: inline-block; /* Ensure button fits content and centers */
+}
+
+.error-page .submit-button:hover {
+    background-color: #00ffcc; /* Lighter teal on hover */
+    transform: translateY(-2px); /* Slight lift effect */
+}
+
+

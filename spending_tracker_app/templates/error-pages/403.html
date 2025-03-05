@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}403 - Forbidden - SpendingTracker{% endblock %}
+
+{% block content %}
+    <div class="login-container" style="background-color: #1e2336;
+    padding: 30px;
+    border-radius: 5px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    width: 350px;
+    text-align: center;
+    margin: 50px auto;">
+        <h2 class="header-title">403 - Forbidden</h2>
+        <div class="error-page fade-in">
+            <p class="error-message">Sorry, you don’t have permission to access this page.</p>
+            <p class="error-description">Please check your credentials or contact an administrator if you believe this is an error.</p>
+            <a href="{% url 'spending_tracker_app:index' %}" class="submit-button">Return to Home</a>
+        </div>
+    </div>
+{% endblock %}

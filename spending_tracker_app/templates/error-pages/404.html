@@ -1,0 +1,21 @@
+{% extends 'authentication_base.html' %}
+{% load static %}
+
+{% block title %}404 - Page Not Found - SpendingTracker{% endblock %}
+
+{% block content %}
+    <div class="login-container" style="background-color: #1e2336;
+    padding: 30px;
+    border-radius: 5px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+    width: 350px;
+    text-align: center;
+    margin: 50px auto;">
+        <h2 class="header-title">404 - Page Not Found</h2>
+        <div class="error-page fade-in">
+            <p class="error-message">Oops! The page you’re looking for doesn’t exist.</p>
+            <p class="error-description">It might have been moved, deleted, or you typed the wrong URL.</p>
+            <a href="{% url 'spending_tracker_app:index' %}" class="submit-button">Return to Home</a>
+        </div>
+    </div>
+{% endblock %}
