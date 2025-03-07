@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Welcome to Spending Tracker{% endblock %}
+
+{% block content %}
+<!-- Hero Section -->
+<section class="hero" style="text-align: center; padding: 60px 20px; background-color: #2a2f4a;">
+    <h1 style="font-size: 48px; color: #00d4b4; margin-bottom: 10px;">Welcome to Spending Tracker</h1>
+    <p style="font-size: 18px; color: #a0a0b0; margin-bottom: 30px;">
+        Take control of your finances with ease. Track your spending, earnings, and budgets all in one place.
+    </p>
+    <a href="{% url 'spending_tracker_app:signup' %}" class="get-started-btn" style="display: inline-block;
+    background-color: #00ff99; color: #fff; padding: 12px 30px; font-size: 18px; font-weight: bold;
+    text-decoration: none; border-radius: 5px; transition: background-color 0.3s; cursor: pointer;">Get Started</a>
+</section>
+
+<!-- Benefits Section -->
+<section class="benefits" style="padding: 40px 20px; background-color: #2a2f4a; text-align: center;">
+    <h2 style="color: #00d4b4; margin-bottom: 30px;">Why Choose Spending Tracker?</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <div class="benefit-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">Save Money</h3>
+            <p style="color: #a0a0b0;">Identify unnecessary expenses and cut back with our smart tracking tools.</p>
+        </div>
+        <div class="benefit-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">Reduce Debt</h3>
+            <p style="color: #a0a0b0;">Set and track debt reduction goals with personalized insights.</p>
+        </div>
+        <div class="benefit-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">Achieve Financial Goals</h3>
+            <p style="color: #a0a0b0;">Whether it’s saving for a vacation or retirement, we help you stay on track.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="features" style="padding: 40px 20px; width: 95%; margin: 0 auto; background-color: #2a2f4a;">
+    <h2 style="color: #00d4b4; text-align: center; margin-bottom: 30px;">What You Can Do</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <div class="feature-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px; text-align: center;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">Track Transactions</h3>
+            <p style="color: #a0a0b0;">Easily log your daily spending and earnings in multiple currencies.</p>
+        </div>
+        <div class="feature-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px; text-align: center;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">Visualize Your Finances</h3>
+            <p style="color: #a0a0b0;">See your spending and earning trends with interactive charts.</p>
+        </div>
+        <div class="feature-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px; text-align: center;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">Plan Your Budget</h3>
+            <p style="color: #a0a0b0;">Set goals and get AI-powered recommendations to stay on track.</p>
+        </div>
+        <div class="feature-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px; text-align: center;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">Generate Reports</h3>
+            <p style="color: #a0a0b0;">Download detailed reports in Excel or PDF format.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials Section -->
+<section class="testimonials" style="padding: 40px 20px; background-color: #2a2f4a; text-align: center;">
+    <h2 style="color: #00d4b4; margin-bottom: 30px;">What Our Users Say</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <div class="testimonial-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <p style="color: #a0a0b0;">"Spending Tracker has completely transformed how I manage my money. I’ve saved hundreds already!"</p>
+            <p style="color: #00ffcc; font-weight: bold;">— Alex P.</p>
+        </div>
+        <div class="testimonial-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <p style="color: #a0a0b0;">"The budgeting tools are a game-changer. I finally feel in control of my finances."</p>
+            <p style="color: #00ffcc; font-weight: bold;">— Jamie L.</p>
+        </div>
+        <div class="testimonial-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <p style="color: #a0a0b0;">"I love the interactive charts! They make it so easy to see where my money is going."</p>
+            <p style="color: #00ffcc; font-weight: bold;">— Sam K.</p>
+        </div>
+    </div>
+</section>
+
+<!-- How It Works Section -->
+<section class="how-it-works" style="padding: 40px 20px; background-color: #2a2f4a; text-align: center;">
+    <h2 style="color: #00d4b4; margin-bottom: 30px;">How It Works</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <div class="step-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">1. Sign Up</h3>
+            <p style="color: #a0a0b0;">Create your free account in just a few clicks.</p>
+        </div>
+        <div class="step-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">2. Log Transactions</h3>
+            <p style="color: #a0a0b0;">Easily add your spending and earnings with our intuitive interface.</p>
+        </div>
+        <div class="step-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">3. Analyze & Plan</h3>
+            <p style="color: #a0a0b0;">Use our tools to visualize your finances and set budgets.</p>
+        </div>
+        <div class="step-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">4. Achieve Your Goals</h3>
+            <p style="color: #a0a0b0;">Stay on track with personalized insights and recommendations.</p>
+        </div>
+    </div>
+</section>
+
+<!-- FAQ Section -->
+<section class="faq" style="padding: 40px 20px; background-color: #2a2f4a; text-align: center;">
+    <h2 style="color: #00d4b4; margin-bottom: 30px;">Frequently Asked Questions</h2>
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+        <div class="faq-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px; text-align: left;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">Is my data secure?</h3>
+            <p style="color: #a0a0b0;">Yes, we use industry-standard encryption to protect your financial data.</p>
+        </div>
+        <div class="faq-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px; text-align: left;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">How much does it cost?</h3>
+            <p style="color: #a0a0b0;">Spending Tracker is free to use with optional premium features.</p>
+        </div>
+        <div class="faq-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px; text-align: left;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">Can I use it on multiple devices?</h3>
+            <p style="color: #a0a0b0;">Yes, your account syncs across all your devices for seamless access.</p>
+        </div>
+        <div class="faq-box" style="background-color: #1e2336; padding: 20px; border-radius: 5px; text-align: left;">
+            <h3 style="color: #00ffcc; margin-bottom: 10px;">What currencies are supported?</h3>
+            <p style="color: #a0a0b0;">We support multiple currencies with automatic conversion for easy tracking.</p>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action Section -->
+<section class="cta" style="text-align: center; padding: 60px 20px; background-color: #1e2336; margin-top: 40px;">
+    <p style="font-size: 20px; color: #a0a0b0; margin-bottom: 20px;">
+        Ready to manage your money like a pro? Join thousands of users today!
+    </p>
+    <a href="{% url 'spending_tracker_app:signup' %}" class="get-started-btn" style="display: inline-block;
+    background-color: #00ff99; color: #fff; padding: 12px 30px; font-size: 18px; font-weight: bold;
+    text-decoration: none; border-radius: 5px; transition: background-color 0.3s; cursor: pointer;">Sign Up Now</a>
+</section>
+{% endblock %}

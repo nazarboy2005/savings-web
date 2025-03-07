@@ -5,7 +5,8 @@ from . import views
 app_name = 'spending_tracker_app'
 
 urlpatterns = [
-    path('', views.index, name='index'),
+    path('', views.landing, name='landing'),
+    path('home/', views.index, name='index'),
     path('add_transaction/', views.add_transaction, name='add_transaction'),
     path('get_transaction/<int:transaction_id>/', views.get_transaction, name='get_transaction'),
     path('update_transaction/<int:transaction_id>/', views.update_transaction, name='update_transaction'),

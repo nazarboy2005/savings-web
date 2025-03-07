@@ -1326,3 +1326,9 @@ def clear_records(request):
         except Exception as e:
             return JsonResponse({'success': False, 'error': str(e)}, status=500)
     return JsonResponse({'success': False, 'error': 'Invalid request method'}, status=400)
+
+
+def landing(request):
+    if request.user.is_authenticated:
+        return redirect('spending_tracker_app:index')
+    return render(request, 'landing-page/landing.html')
