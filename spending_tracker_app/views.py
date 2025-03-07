@@ -445,6 +445,8 @@ def index(request):
         'display_currency': display_currency,
         'total_earned': float(total_earned),
         'total_spent': float(total_spent),
+        'user_preferred_currency': UserProfile.objects.get(user=request.user).preferred_currency
+
     }
     return render(request, 'index.html', context)
 
@@ -530,6 +532,7 @@ def charts(request):
         'earning_trends': earning_trends,
         'net_balance_trends': net_balance_trends,  # New data for net balance
         'display_currency': display_currency,
+        'user_preferred_currency': UserProfile.objects.get(user=request.user).preferred_currency
     }
     return render(request, 'charts.html', context)
 
@@ -540,7 +543,7 @@ def charts(request):
 def profile(request):
     transactions = Transaction.objects.filter(user=request.user)
     plans = Plan.objects.filter(user=request.user)
-    display_currency = request.GET.get('display_currency', request.session.get('preferred_currency', 'QAR'))
+    display_currency = UserProfile.objects.get(user=request.user).preferred_currency
 
     total_spent = Decimal('0')
     total_earned = Decimal('0')
@@ -1282,6 +1285,10 @@ def set_currency(request):
     if request.method == 'POST':
         preferred_currency = request.POST.get('preferred_currency')
         if preferred_currency:
+            user_profile = UserProfile.objects.get(user=request.user)
+            user_profile.preferred_currency = preferred_currency
+            user_profile.save()
+
             request.session['preferred_currency'] = preferred_currency
             return redirect('spending_tracker_app:index')
     return render(request, 'set_currency.html')
@@ -1311,9 +1318,12 @@ def update_currency(request):
     if request.method == 'POST':
         preferred_currency = request.POST.get('preferred_currency')
         if preferred_currency:
+            user_profile = UserProfile.objects.get(user=request.user)
+            user_profile.preferred_currency = preferred_currency
+            user_profile.save()
             request.session['preferred_currency'] = preferred_currency
-        return redirect('spending_tracker_app:index')
-    return redirect('spending_tracker_app:index')
+        return redirect('spending_tracker_app:profile')
+    return redirect('spending_tracker_app:profile')
 
 @login_required
 def clear_records(request):

@@ -8,6 +8,7 @@ class UserProfile(models.Model):
     email_verified = models.BooleanField(default=False)
     verification_token = models.CharField(max_length=100, blank=True, null=True)
     token_expiry = models.DateTimeField(blank=True, null=True)
+    preferred_currency = models.CharField(max_length=15, default='UZS')
 
     def is_token_valid(self):
         return self.token_expiry is not None and timezone.now() < self.token_expiry

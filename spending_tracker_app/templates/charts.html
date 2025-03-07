@@ -28,7 +28,7 @@
             <select name="display_currency" id="displayCurrency">
                 <option value="QAR" {% if request.GET.display_currency == 'QAR' %}selected{% endif %}>QAR</option>
                 <option value="USD" {% if request.GET.display_currency == 'USD' %}selected{% endif %}>USD</option>
-                <option value="UZS" {% if request.GET.display_currency == 'UZS' %}selected{% endif %}>UZS</option> <!-- Added UZS option -->
+                <option value="{{ user_preferred_currency }}" {% if request.GET.display_currency == {{ user_preferred_currency }} %}selected{% endif %}> {{user_preferred_currency}} </option> <!-- Added UZS option -->
             </select>
             <button type="submit">Apply Filters</button>
         </form>

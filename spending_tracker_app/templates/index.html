@@ -34,7 +34,7 @@
         <select name="display_currency" id="displayCurrency">
             <option value="QAR" {% if request.GET.display_currency == 'QAR' %}selected{% endif %}>QAR</option>
             <option value="USD" {% if request.GET.display_currency == 'USD' %}selected{% endif %}>USD</option>
-            <option value="{{ request.session.preferred_currency|default:'EUR' }}" {% if request.GET.display_currency == request.session.preferred_currency %}selected{% endif %}>{{ request.session.preferred_currency|default:'EUR' }}</option>
+            <option value="{{ user_preferred_currency }}" {% if request.GET.display_currency == user_preferred_currency %}selected{% endif %}>{{ user_preferred_currency }}</option>
         </select>
         <button type="button" id="apply-filters" style="background-color: teal;" onclick="applyFilters()">Apply Filters</button>
     </form>
@@ -86,9 +86,10 @@
         <input type="number" id="amount" name="amount" required min="0" step="0.01">
         <label for="currency">Currency:</label>
         <select id="currency" name="currency" required>
+            <option value="">Select currency</option>
             <option value="QAR">QAR</option>
             <option value="USD">USD</option>
-            <option value="{{ request.session.preferred_currency|default:'EUR' }}" {% if request.session.preferred_currency %}selected{% endif %}>{{ request.session.preferred_currency|default:'EUR' }}</option>
+            <option value="{{ user_preferred_currency }}" selected> {{ user_preferred_currency }} </option>
         </select>
         <label for="status">Spent/Earned:</label>
         <select id="status" name="status" required>
@@ -122,7 +123,7 @@
         <select id="editCurrency" name="currency" required>
             <option value="QAR">QAR</option>
             <option value="USD">USD</option>
-            <option value="{{ request.session.preferred_currency|default:'EUR' }}" {% if request.session.preferred_currency %}selected{% endif %}>{{ request.session.preferred_currency|default:'EUR' }}</option>
+            <option value="{{ user_preferred_currency }}" selected>{{ preferred_currency }}</option>
         </select>
         <label for="editStatus">Spent/Earned:</label>
         <select id="editStatus" name="status" required>
